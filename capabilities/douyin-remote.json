@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "douyin-remote",
+  "description": "允许抖音店铺远程页面调用 Tauri 命令",
+  "webviews": ["08_douyin_*"],
+  "remote": {
+    "urls": [
+      "https://im.jinritemai.com/*",
+      "https://fxg.jinritemai.com/*",
+      "https://*.jinritemai.com/*"
+    ]
+  },
+  "permissions": [
+    "core:default"
+  ]
+}
