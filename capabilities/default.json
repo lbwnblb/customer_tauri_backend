@@ -8,6 +8,15 @@
   },
   "permissions": [
     "core:default",
-    "opener:default"
+    "opener:default",
+    "allow-add-shop-channel",
+    "allow-start-backend-channel",
+    "allow-shop-account",
+    "allow-add-shop",
+    "allow-delete-shop",
+    "allow-shop-list",
+    "allow-select-shop",
+    "allow-select-platform",
+    "allow-greet"
   ]
 }

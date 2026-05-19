@@ -1,0 +1,46 @@
+# 自定义命令权限定义
+
+[[permission]]
+identifier = "allow-add-shop-channel"
+description = "允许调用 add_shop_channel"
+commands.allow = ["add_shop_channel"]
+
+[[permission]]
+identifier = "allow-start-backend-channel"
+description = "允许调用 start_backend_channel"
+commands.allow = ["start_backend_channel"]
+
+[[permission]]
+identifier = "allow-shop-account"
+description = "允许调用 shop_account"
+commands.allow = ["shop_account"]
+
+[[permission]]
+identifier = "allow-add-shop"
+description = "允许调用 add_shop"
+commands.allow = ["add_shop"]
+
+[[permission]]
+identifier = "allow-delete-shop"
+description = "允许调用 delete_shop"
+commands.allow = ["delete_shop"]
+
+[[permission]]
+identifier = "allow-shop-list"
+description = "允许调用 shop_list"
+commands.allow = ["shop_list"]
+
+[[permission]]
+identifier = "allow-select-shop"
+description = "允许调用 select_shop"
+commands.allow = ["select_shop"]
+
+[[permission]]
+identifier = "allow-select-platform"
+description = "允许调用 select_platform"
+commands.allow = ["select_platform"]
+
+[[permission]]
+identifier = "allow-greet"
+description = "允许调用 greet"
+commands.allow = ["greet"]
