@@ -44,3 +44,8 @@ commands.allow = ["select_platform"]
 identifier = "allow-greet"
 description = "允许调用 greet"
 commands.allow = ["greet"]
+
+[[permission]]
+identifier = "allow-on-request"
+description = "允许调用 on_request"
+commands.allow = ["on_request"]

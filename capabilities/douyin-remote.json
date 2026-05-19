@@ -10,6 +10,7 @@
   },
   "permissions": [
     "core:default",
-    "allow-add-shop-channel"
+    "allow-add-shop-channel",
+    "allow-on-request"
   ]
 }

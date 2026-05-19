@@ -17,6 +17,7 @@
     "allow-shop-list",
     "allow-select-shop",
     "allow-select-platform",
-    "allow-greet"
+    "allow-greet",
+    "allow-on-request"
   ]
 }

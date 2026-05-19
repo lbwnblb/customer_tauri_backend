@@ -4,18 +4,25 @@ pub fn create_intercepted_webview() -> String {
     if (window.__feige_intercept_installed) return;
     window.__feige_intercept_installed = true;
 
+    // ★ 防递归锁 ★
+    // invoke('on_request') 底层走 fetch (Tauri IPC),
+    // 如果不加锁: fetch → 拦截 → invoke → fetch → 拦截 → … 无限递归卡死
+    let _busy = false;
+
     const safeInvoke = (payload) => {
         try {
             if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
                 window.__TAURI__.core.invoke('on_request', { payload })
-                    .catch(() => {}); // 吞掉 rejection,避免污染页面
+                    .catch(() => {});
             }
         } catch (_) {}
     };
 
     const log = (type, method, url, body) => {
         try {
-            const urlObj = new URL(url, location.href);
+            let base = location.href;
+            if (!base || base === 'about:blank') base = 'https://placeholder.invalid';
+            const urlObj = new URL(url, base);
             const params = Object.fromEntries(urlObj.searchParams.entries());
             const info = {
                 type, method,
@@ -26,7 +33,7 @@ pub fn create_intercepted_webview() -> String {
 
             if (body) {
                 if (typeof body === 'string') {
-                    try { info.body = JSON.parse(body); } catch { info.body = body; }
+                    try { info.body = JSON.parse(body); } catch(_) { info.body = body; }
                 } else if (body instanceof URLSearchParams) {
                     info.body = Object.fromEntries(body.entries());
                 } else if (typeof FormData !== 'undefined' && body instanceof FormData) {
@@ -34,62 +41,81 @@ pub fn create_intercepted_webview() -> String {
                     body.forEach((v, k) => { obj[k] = v; });
                     info.body = obj;
                 }
-                // ReadableStream / Blob 等就跳过,别去读它,否则会消费掉 body
             }
 
-            console.log('[拦截 ' + type + ']', method, urlObj.pathname, info);
             safeInvoke(JSON.stringify(info));
-        } catch (e) {
-            // 任何异常都不能往外抛
-        }
+        } catch (_) {}
     };
 
     // ---- fetch ----
     try {
-        const originalFetch = window.fetch;
-        if (typeof originalFetch === 'function') {
-            window.fetch = function(input, init) {
-                try {
-                    const url = input instanceof Request ? input.url : String(input);
-                    const method = (init && init.method) ||
-                                   (input instanceof Request ? input.method : 'GET');
-                    const body = (init && init.body) || null;
-                    log('fetch', String(method).toUpperCase(), url, body);
-                } catch (_) {}
-                // 关键:用 window 作为 this,不要用调用方的 this
-                return originalFetch.apply(window, arguments);
-            };
+        const _origFetch = window.fetch;
+        if (typeof _origFetch === 'function') {
+            window.fetch = new Proxy(_origFetch, {
+                apply(target, thisArg, argsList) {
+                    if (!_busy) {
+                        _busy = true;
+                        try {
+                            const [input, init] = argsList;
+                            const url = (input instanceof Request) ? input.url : String(input || '');
+                            const method = (init && init.method) ||
+                                           ((input instanceof Request) ? input.method : 'GET');
+                            const body = (init && init.body) || null;
+                            log('fetch', String(method).toUpperCase(), url, body);
+                        } catch (_) {}
+                        _busy = false;
+                    }
+                    return Reflect.apply(target, thisArg, argsList);
+                }
+            });
         }
     } catch (_) {}
 
     // ---- XHR ----
     try {
         const proto = XMLHttpRequest.prototype;
-        const originalOpen = proto.open;
-        const originalSend = proto.send;
-        proto.open = function(method, url) {
-            try {
-                Object.defineProperty(this, '__fg_method', { value: method, writable: true, configurable: true });
-                Object.defineProperty(this, '__fg_url', { value: url, writable: true, configurable: true });
-            } catch (_) {}
-            return originalOpen.apply(this, arguments);
-        };
-        proto.send = function(body) {
-            try {
-                log('xhr', String(this.__fg_method || 'GET').toUpperCase(), this.__fg_url || '', body);
-            } catch (_) {}
-            return originalSend.apply(this, arguments);
-        };
+        const _origOpen = proto.open;
+        const _origSend = proto.send;
+        const xhrMap = new WeakMap();
+
+        proto.open = new Proxy(_origOpen, {
+            apply(target, thisArg, argsList) {
+                try { xhrMap.set(thisArg, { m: argsList[0], u: argsList[1] }); } catch (_) {}
+                return Reflect.apply(target, thisArg, argsList);
+            }
+        });
+
+        proto.send = new Proxy(_origSend, {
+            apply(target, thisArg, argsList) {
+                if (!_busy) {
+                    _busy = true;
+                    try {
+                        const meta = xhrMap.get(thisArg);
+                        if (meta) {
+                            log('xhr', String(meta.m || 'GET').toUpperCase(), meta.u || '', argsList[0]);
+                        }
+                    } catch (_) {}
+                    _busy = false;
+                }
+                return Reflect.apply(target, thisArg, argsList);
+            }
+        });
     } catch (_) {}
 
     // ---- sendBeacon ----
     try {
         if (navigator.sendBeacon) {
-            const originalBeacon = navigator.sendBeacon.bind(navigator);
-            navigator.sendBeacon = function(url, data) {
-                try { log('beacon', 'POST', url, data); } catch (_) {}
-                return originalBeacon(url, data);
-            };
+            const _origBeacon = navigator.sendBeacon;
+            navigator.sendBeacon = new Proxy(_origBeacon, {
+                apply(target, thisArg, argsList) {
+                    if (!_busy) {
+                        _busy = true;
+                        try { log('beacon', 'POST', argsList[0], argsList[1]); } catch (_) {}
+                        _busy = false;
+                    }
+                    return Reflect.apply(target, thisArg, argsList);
+                }
+            });
         }
     } catch (_) {}
 
