@@ -18,6 +18,7 @@
     "allow-select-shop",
     "allow-select-platform",
     "allow-greet",
-    "allow-on-request"
+    "allow-on-request",
+    "allow-on-ws"
   ]
 }

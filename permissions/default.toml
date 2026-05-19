@@ -49,3 +49,9 @@ commands.allow = ["greet"]
 identifier = "allow-on-request"
 description = "允许调用 on_request"
 commands.allow = ["on_request"]
+
+[[permission]]
+identifier = "allow-on-ws"
+description = "允许调用 on_ws"
+commands.allow = ["on_ws"]
+

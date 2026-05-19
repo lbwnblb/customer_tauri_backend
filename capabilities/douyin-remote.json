@@ -11,6 +11,7 @@
   "permissions": [
     "core:default",
     "allow-add-shop-channel",
-    "allow-on-request"
+    "allow-on-request",
+    "allow-on-ws"
   ]
 }

@@ -1,5 +1,17 @@
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+
 use crate::utils::HttpClient;
 use serde::{Deserialize, Serialize};
+use tauri::Webview;
+
+pub static SHOP_INFO_PARAMS: LazyLock<Mutex<HashMap<String, FeigeShopInfoParams>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub static REQUEST_HEADERS: LazyLock<Mutex<HashMap<String, HashMap<String, String>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FeigeCookie {
@@ -46,8 +58,61 @@ pub struct FeigeCookie {
     pub gfkadpd: Option<String>,
 }
 
+impl FeigeCookie {
+    pub fn update_from_query(&mut self, query: &serde_json::Map<String, serde_json::Value>) {
+        for (key, value) in query {
+            if let Some(val) = value.as_str() {
+                match key.as_str() {
+                    "s_v_web_id" => self.s_v_web_id = Some(val.to_string()),
+                    "passport_csrf_token" => self.passport_csrf_token = Some(val.to_string()),
+                    "passport_csrf_token_default" => self.passport_csrf_token_default = Some(val.to_string()),
+                    "x_web_secsdk_uid" | "x-web-secsdk-uid" => self.x_web_secsdk_uid = Some(val.to_string()),
+                    "hm_lvt_" => self.hm_lvt_ = Some(val.to_string()),
+                    "hmaccount" | "HMACCOUNT" => self.hmaccount = Some(val.to_string()),
+                    "passport_mfa_token" => self.passport_mfa_token = Some(val.to_string()),
+                    "uid_tt" => self.uid_tt = Some(val.to_string()),
+                    "uid_tt_ss" => self.uid_tt_ss = Some(val.to_string()),
+                    "sid_tt" => self.sid_tt = Some(val.to_string()),
+                    "sessionid" => self.sessionid = Some(val.to_string()),
+                    "sessionid_ss" => self.sessionid_ss = Some(val.to_string()),
+                    "is_staff_user" => self.is_staff_user = Some(val.to_string()),
+                    "has_biz_token" => self.has_biz_token = Some(val.to_string()),
+                    "ucas_c0" => self.ucas_c0 = Some(val.to_string()),
+                    "ucas_c0_ss" => self.ucas_c0_ss = Some(val.to_string()),
+                    "phpsessid" | "PHPSESSID" => self.phpsessid = Some(val.to_string()),
+                    "phpsessid_ss" | "PHPSESSID_SS" => self.phpsessid_ss = Some(val.to_string()),
+                    "ecom_us_lt" => self.ecom_us_lt = Some(val.to_string()),
+                    "ecom_us_lt_ss" => self.ecom_us_lt_ss = Some(val.to_string()),
+                    "zsgw_business_data" => self.zsgw_business_data = Some(val.to_string()),
+                    "source" => self.source = Some(val.to_string()),
+                    "doudain_safety_did" => self.doudain_safety_did = Some(val.to_string()),
+                    "csrf_session_id" => self.csrf_session_id = Some(val.to_string()),
+                    "shop_id" | "SHOP_ID" => self.shop_id = Some(val.to_string()),
+                    "pigeon_cid" | "PIGEON_CID" => self.pigeon_cid = Some(val.to_string()),
+                    "ffa_goods_ewid" => self.ffa_goods_ewid = Some(val.to_string()),
+                    "ffa_goods_seraph_did" => self.ffa_goods_seraph_did = Some(val.to_string()),
+                    "security_mc_1_s_sdk_crypt_sdk" | "__security_mc_1_s_sdk_crypt_sdk" => self.security_mc_1_s_sdk_crypt_sdk = Some(val.to_string()),
+                    "bd_ticket_guard_client_web_domain" => self.bd_ticket_guard_client_web_domain = Some(val.to_string()),
+                    "sid_guard" => self.sid_guard = Some(val.to_string()),
+                    "session_tlb_tag" => self.session_tlb_tag = Some(val.to_string()),
+                    "sid_ucp_v1" => self.sid_ucp_v1 = Some(val.to_string()),
+                    "ssid_ucp_v1" => self.ssid_ucp_v1 = Some(val.to_string()),
+                    "biz_trace_id" => self.biz_trace_id = Some(val.to_string()),
+                    "bd_ticket_guard_client_data" => self.bd_ticket_guard_client_data = Some(val.to_string()),
+                    "odin_tt" => self.odin_tt = Some(val.to_string()),
+                    "hm_lpvt_" => self.hm_lpvt_ = Some(val.to_string()),
+                    "ttwid" => self.ttwid = Some(val.to_string()),
+                    "ecom_gray_shop_id" => self.ecom_gray_shop_id = Some(val.to_string()),
+                    "gfkadpd" => self.gfkadpd = Some(val.to_string()),
+                    _ => {}
+                }
+            }
+        }
+    }
+}
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeigeShopInfoParams {
     pub version: Option<String>,
     pub appid: Option<String>,
@@ -66,30 +131,251 @@ pub struct FeigeShopInfoParams {
     pub a_bogus: Option<String>,
 }
 
-pub async fn feige_shop_info() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = HttpClient::new();
-    client.set_default_headers(&[
-        ("accept", "application/json, text/plain, */*"),
-        ("accept-language", "zh-CN,zh;q=0.9,en;q=0.8"),
-        ("priority", "u=1, i"),
+impl Default for FeigeShopInfoParams {
+    fn default() -> Self {
+        Self {
+            version: Some("0".to_string()),
+            appid: Some("1".to_string()),
+            token: Some("dec6825093e192e7986d5c20fde6f1ac".to_string()),
+            bid: Some("fxg_admin".to_string()),
+            lid: Some("676892719333".to_string()),
+            verify_fp: Some("verify_mp527ktm_mJeZdDCs_MtIX_4vRz_B9rL_JADHn91hXVlo".to_string()),
+            fp: Some("verify_mp527ktm_mJeZdDCs_MtIX_4vRz_B9rL_JADHn91hXVlo".to_string()),
+            ms_token: Some("8Kb8SFlPhwPTVEQeTCelJriT4ZRpJVt9XZrT9w9EhVxj8CplumOALgWL4lv-uwtgmLndepMGchnvAH36U8yZXJKN-VICLEJxN3K7Y8UCFeDMjmsUGQJ7yCMmsW-pF-cDiqN1-tQYeYhK552ZtijPxdxn7Xi2d4-IXGqv6re0asIKGAr23fvHwd4=".to_string()),
+            a_bogus: Some("Ev0nDey7Op8fa3CGuOnI75xli2LMrPWyK1T/RFazH1cpPhFaq01FbBcsjoLCm52hX8BwNHV7GjlAYxVcYHT0Ze9kKmkvSkty1s5CV8fLZqiZGMU8DqWsS8kzww0z05wia5VUi1fUhUGHZnOWDZQm/-lyHA8CQ5gZFq9ykqYbOIGVZ0LlEZnlPdGZOhGqLD==".to_string()),
+        }
+    }
+}
+
+impl FeigeShopInfoParams {
+    pub fn update_from_query(&mut self, query: &serde_json::Map<String, serde_json::Value>) {
+        for (key, value) in query {
+            if let Some(val) = value.as_str() {
+                match key.as_str() {
+                    "version" => self.version = Some(val.to_string()),
+                    "appid" => self.appid = Some(val.to_string()),
+                    "__token" => self.token = Some(val.to_string()),
+                    "_bid" => self.bid = Some(val.to_string()),
+                    "_lid" => self.lid = Some(val.to_string()),
+                    "verifyFp" => self.verify_fp = Some(val.to_string()),
+                    "fp" => self.fp = Some(val.to_string()),
+                    "msToken" => self.ms_token = Some(val.to_string()),
+                    "a_bogus" => self.a_bogus = Some(val.to_string()),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    pub fn to_query_string(&self) -> String {
+        let mut params: Vec<String> = Vec::new();
+        if let Some(ref v) = self.version { params.push(format!("version={}", v)); }
+        if let Some(ref v) = self.appid { params.push(format!("appid={}", v)); }
+        if let Some(ref v) = self.token { params.push(format!("__token={}", v)); }
+        if let Some(ref v) = self.bid { params.push(format!("_bid={}", v)); }
+        if let Some(ref v) = self.lid { params.push(format!("_lid={}", v)); }
+        if let Some(ref v) = self.verify_fp { params.push(format!("verifyFp={}", v)); }
+        if let Some(ref v) = self.fp { params.push(format!("fp={}", v)); }
+        if let Some(ref v) = self.ms_token { params.push(format!("msToken={}", v)); }
+        if let Some(ref v) = self.a_bogus { params.push(format!("a_bogus={}", v)); }
+        params.join("&")
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeShopLogo {
+    pub file_id: Option<String>,
+    pub url: Option<String>,
+    pub uri: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeShopNameSection {
+    pub not_allow_update: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeQualStatusInfo {
+    pub task_id: Option<String>,
+    pub status: Option<i32>,
+    pub audit_status: Option<i32>,
+    pub reject_reasons: Option<Vec<String>>,
+    pub submit_time: Option<String>,
+    pub audit_time: Option<String>,
+    pub build_source: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeShopForm {
+    pub shop_form_enum: Option<i32>,
+    pub shop_form_code: Option<String>,
+    pub shop_form_cn: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeAddressItem {
+    pub code: Option<String>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeShopAddress {
+    pub province: Option<FeigeAddressItem>,
+    pub city: Option<FeigeAddressItem>,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeShopSettleDay {
+    pub detail_url: Option<String>,
+    pub delay_day_list: Option<Vec<i32>>,
+    pub delay_day_display: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeShopInfoData {
+    pub qual_id: Option<String>,
+    pub shop_type: Option<i32>,
+    pub shop_name: Option<String>,
+    pub shop_logo: Option<FeigeShopLogo>,
+    pub brand_src: Option<i32>,
+    pub portrait_auth_term: Option<String>,
+    pub taxfree_licence_term: Option<String>,
+    pub shop_name_section: Option<FeigeShopNameSection>,
+    pub is_auto_generated_shop_logo: Option<bool>,
+    pub qual_status_info: Option<FeigeQualStatusInfo>,
+    pub shop_form: Option<FeigeShopForm>,
+    pub shop_actual_address: Option<FeigeShopAddress>,
+    pub personal_business_scope: Option<Vec<i32>>,
+    pub allow_store_reuse_qual: Option<i32>,
+    pub shop_has_brand35: Option<bool>,
+    pub poi_id: Option<String>,
+    pub custom_id: Option<String>,
+    pub shop_settle_day: Option<FeigeShopSettleDay>,
+    pub operate_status: Option<i32>,
+    pub operate_status_str: Option<String>,
+    pub shop_open_time: Option<i64>,
+    pub shop_open_time_str: Option<String>,
+    pub allow_update_main_category: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeExtra {
+    pub log_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FeigeShopInfoResponse {
+    pub data: Option<FeigeShopInfoData>,
+    pub code: Option<i32>,
+    pub msg: Option<String>,
+    pub extra: Option<FeigeExtra>,
+}
+
+pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<FeigeShopInfoResponse, Box<dyn std::error::Error>> {
+    let cookie_str = webview
+        .cookies()
+        .map(|cookies| {
+            cookies
+                .iter()
+                .map(|c| format!("{}={}", c.name(), c.value()))
+                .collect::<Vec<_>>()
+                .join("; ")
+        })
+        .unwrap_or_default();
+
+    let query_string = SHOP_INFO_PARAMS
+        .lock()
+        .unwrap()
+        .get(webview_id)
+        .map(|p| p.to_query_string())
+        .unwrap_or_default();
+
+    let url = format!(
+        "https://fxg.jinritemai.com/center/qualification/shop/info?{}",
+        query_string
+    );
+
+    let (accept, accept_language, priority, sec_ch_ua, sec_ch_ua_mobile, sec_ch_ua_platform, sec_fetch_dest, sec_fetch_mode, sec_fetch_site, user_agent) = {
+        let headers_map = REQUEST_HEADERS.lock().unwrap();
+        let webview_headers = headers_map.get(webview_id);
+
+        let accept = webview_headers
+            .and_then(|h| h.get("accept"))
+            .cloned()
+            .unwrap_or_else(|| "application/json, text/plain, */*".to_string());
+        let accept_language = webview_headers
+            .and_then(|h| h.get("accept-language"))
+            .cloned()
+            .unwrap_or_else(|| "zh-CN,zh;q=0.9,en;q=0.8".to_string());
+        let priority = webview_headers
+            .and_then(|h| h.get("priority"))
+            .cloned()
+            .unwrap_or_else(|| "u=1, i".to_string());
+        let sec_ch_ua = webview_headers
+            .and_then(|h| h.get("sec-ch-ua"))
+            .cloned()
+            .unwrap_or_else(|| "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"".to_string());
+        let sec_ch_ua_mobile = webview_headers
+            .and_then(|h| h.get("sec-ch-ua-mobile"))
+            .cloned()
+            .unwrap_or_else(|| "?0".to_string());
+        let sec_ch_ua_platform = webview_headers
+            .and_then(|h| h.get("sec-ch-ua-platform"))
+            .cloned()
+            .unwrap_or_else(|| "\"Windows\"".to_string());
+        let sec_fetch_dest = webview_headers
+            .and_then(|h| h.get("sec-fetch-dest"))
+            .cloned()
+            .unwrap_or_else(|| "empty".to_string());
+        let sec_fetch_mode = webview_headers
+            .and_then(|h| h.get("sec-fetch-mode"))
+            .cloned()
+            .unwrap_or_else(|| "cors".to_string());
+        let sec_fetch_site = webview_headers
+            .and_then(|h| h.get("sec-fetch-site"))
+            .cloned()
+            .unwrap_or_else(|| "same-origin".to_string());
+        let user_agent = webview_headers
+            .and_then(|h| h.get("user-agent"))
+            .cloned()
+            .unwrap_or_else(|| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36".to_string());
+
+        (accept, accept_language, priority, sec_ch_ua, sec_ch_ua_mobile, sec_ch_ua_platform, sec_fetch_dest, sec_fetch_mode, sec_fetch_site, user_agent)
+    };
+
+    let headers: &[(&str, &str)] = &[
+        ("accept", &accept),
+        ("accept-language", &accept_language),
+        ("priority", &priority),
         ("referer", "https://fxg.jinritemai.com/ffa/mshop/homepage/index"),
-        ("sec-ch-ua", "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\""),
-        ("sec-ch-ua-mobile", "?0"),
-        ("sec-ch-ua-platform", "\"Windows\""),
-        ("sec-fetch-dest", "empty"),
-        ("sec-fetch-mode", "cors"),
-        ("sec-fetch-site", "same-origin"),
-        ("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"),
-        ("cookie", "s_v_web_id=verify_mp527ktm_mJeZdDCs_MtIX_4vRz_B9rL_JADHn91hXVlo; passport_csrf_token=8e3d9de665b49ca6f0c4f8d4c453d2cb; passport_csrf_token_default=8e3d9de665b49ca6f0c4f8d4c453d2cb; x-web-secsdk-uid=963b0c06-89c1-4442-82cb-40bfcaad3612; Hm_lvt_b6520b076191ab4b36812da4c90f7a5e=1778737215; HMACCOUNT=79B115A86823BFF7; passport_mfa_token=CjHOL6AFjWMcPTh41Q%2Bqyewe5uyoYUySnfbAcUo5m70rTUrpHCUBqAs8fWz22N6%2FGG%2BnGkoKPAAAAAAAAAAAAABQbDRVU9Vlv7%2Ftc9908KQrhRhe0UsbHdoQB2ac1c%2Bp3wDS9G4QK73%2Basz1EWPxmZxPoRCmwZEOGPax0WwgAiIBA5GhIWs%3D; uid_tt=5e537c13d25b05b5868d19a6edb8660b; uid_tt_ss=5e537c13d25b05b5868d19a6edb8660b; sid_tt=55343f4379f3ad5e66ac2ad532be4f77; sessionid=55343f4379f3ad5e66ac2ad532be4f77; sessionid_ss=55343f4379f3ad5e66ac2ad532be4f77; is_staff_user=false; has_biz_token=false; ucas_c0=CkEKBTEuMC4wEJuIhOzd-bSDahjmJiCvnbD5uYzFAiiwITDA9bDC743JAkDQp5vQBkjQ29fSBlCJvNuQy4i4rWhYbxIUP4IXJVZ7f19Mz3Z1JR8COryspFQ; ucas_c0_ss=CkEKBTEuMC4wEJuIhOzd-bSDahjmJiCvnbD5uYzFAiiwITDA9bDC743JAkDQp5vQBkjQ29fSBlCJvNuQy4i4rWhYbxIUP4IXJVZ7f19Mz3Z1JR8COryspFQ; PHPSESSID=c54448ebaa5311327493fee24518d98e; PHPSESSID_SS=c54448ebaa5311327493fee24518d98e; ecom_us_lt=8227995d973ab8d9eafff1e175938b230f0455342cd9c56b7d7f1955e83c2558; ecom_us_lt_ss=8227995d973ab8d9eafff1e175938b230f0455342cd9c56b7d7f1955e83c2558; zsgw_business_data=%7B%22uuid%22%3A%229ae8e350-9e15-4b63-a740-98f72d47d64b%22%2C%22platform%22%3A%22pc%22%2C%22source%22%3A%22seo.fxg.jinritemai.com%22%7D; source=seo.fxg.jinritemai.com; doudain_safety_did=3493615810962619; csrf_session_id=988c027c359ce20caf8db1a7cc7e2673; SHOP_ID=510024; PIGEON_CID=7519569113498705417; ffa_goods_ewid=3493615810962619; ffa_goods_seraph_did=3493615810962619; __security_mc_1_s_sdk_crypt_sdk=7ed749af-4401-ae7e; bd_ticket_guard_client_web_domain=2; sid_guard=55343f4379f3ad5e66ac2ad532be4f77%7C1778833114%7C5183223%7CTue%2C+14-Jul-2026+08%3A05%3A37+GMT; session_tlb_tag=sttt%7C14%7CVTQ_Q3nzrV5mrCrVMr5Pd_________-lb_ysSGPaBOlFWjSC-GMR9bURKKanpA65gCor4EpuvDM%3D; sid_ucp_v1=1.0.0-KDVmMDExYjBlMDlkYzdhMTgwOGUxNDEwNDM0MDAyOTAyZDg4MjAyNjEKGQjA9bDC743JAhDarZvQBhiwISAMOAFA6wcaAmxmIiA1NTM0M2Y0Mzc5ZjNhZDVlNjZhYzJhZDUzMmJlNGY3Nw; ssid_ucp_v1=1.0.0-KDVmMDExYjBlMDlkYzdhMTgwOGUxNDEwNDM0MDAyOTAyZDg4MjAyNjEKGQjA9bDC743JAhDarZvQBhiwISAMOAFA6wcaAmxmIiA1NTM0M2Y0Mzc5ZjNhZDVlNjZhYzJhZDUzMmJlNGY3Nw; biz_trace_id=a19eea69; bd_ticket_guard_client_data=eyJiZC10aWNrZXQtZ3VhcmQtdmVyc2lvbiI6MiwiYmQtdGlja2V0LWd1YXJkLWl0ZXJhdGlvbi12ZXJzaW9uIjoxLCJiZC10aWNrZXQtZ3VhcmQtcmVlLXB1YmxpYy1rZXkiOiJCRFhTUjd2dkRkNCtOVDhjQmVJaU53aWNoVGk2MUIwVUhiaStpUDkyTEhkTjNtcVhKVXZOMUo2TzRlWDVhTXJja3lUKzRwaDJzbFRpZHFST09DMEFTZ289IiwiYmQtdGlja2V0LWd1YXJkLXdlYi12ZXJzaW9uIjoyfQ%3D%3D; odin_tt=bf7a0b911b4cd1bd653ffaabc2dffa8d04a75b2faf56dee49e6bb3f6941885e4fbc8f88b0dbc3e7ca2869d8ed417e7b1; Hm_lpvt_b6520b076191ab4b36812da4c90f7a5e=1779166220; ttwid=1%7Cc3kWTnpqToqKzUJ-2E0d7zFuIinZw_7c3BxlUsvzIGw%7C1779166221%7C86c7d964eae06238076b50399e12e376b8a4a1a8db7462a7f055f31dfd169da6; ecom_gray_shop_id=510024; gfkadpd=4272,23756"),
-    ]);
+        ("sec-ch-ua", &sec_ch_ua),
+        ("sec-ch-ua-mobile", &sec_ch_ua_mobile),
+        ("sec-ch-ua-platform", &sec_ch_ua_platform),
+        ("sec-fetch-dest", &sec_fetch_dest),
+        ("sec-fetch-mode", &sec_fetch_mode),
+        ("sec-fetch-site", &sec_fetch_site),
+        ("user-agent", &user_agent),
+        ("cookie", &cookie_str),
+    ];
 
-    let res = client.get(
-        "https://fxg.jinritemai.com/center/qualification/shop/info\
-     ?appid=1\
-     &__token=dec6825093e192e7986d5c20fde6f1ac\
-     &_bid=fxg_admin\
-     &_lid=676892719333"
-    ).await?;    println!("{}", res.body);
 
-    Ok(())
+
+    let mut client = HttpClient::new();
+    client.set_default_headers(headers);
+
+    let res = client.get(&url).await?;
+
+    if res.is_success() {
+        match res.json::<FeigeShopInfoResponse>() {
+            Ok(parsed) => Ok(parsed),
+            Err(e) => {
+                log::error!("[feige_shop_info] JSON 解析失败: {}", e);
+                Err(e.into())
+            }
+        }
+    } else {
+        log::error!("[feige_shop_info] 请求失败, url: {}, webview_id: {}, status: {}", url, webview_id, res.status);
+        Err(format!("HTTP 请求失败, status: {}", res.status).into())
+    }
 }

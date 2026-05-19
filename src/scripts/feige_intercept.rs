@@ -4,9 +4,6 @@ pub fn create_intercepted_webview() -> String {
     if (window.__feige_intercept_installed) return;
     window.__feige_intercept_installed = true;
 
-    // ★ 防递归锁 ★
-    // invoke('on_request') 底层走 fetch (Tauri IPC),
-    // 如果不加锁: fetch → 拦截 → invoke → fetch → 拦截 → … 无限递归卡死
     let _busy = false;
 
     const safeInvoke = (payload) => {
@@ -18,7 +15,27 @@ pub fn create_intercepted_webview() -> String {
         } catch (_) {}
     };
 
-    const log = (type, method, url, body) => {
+    const extractHeaders = (headers) => {
+        if (!headers) return null;
+        try {
+            if (headers instanceof Headers) {
+                const obj = {};
+                headers.forEach((v, k) => { obj[k] = v; });
+                return obj;
+            }
+            if (Array.isArray(headers)) {
+                const obj = {};
+                headers.forEach(([k, v]) => { obj[k] = v; });
+                return obj;
+            }
+            if (typeof headers === 'object') {
+                return Object.assign({}, headers);
+            }
+        } catch (_) {}
+        return null;
+    };
+
+    const log = (type, method, url, body, headers) => {
         try {
             let base = location.href;
             if (!base || base === 'about:blank') base = 'https://placeholder.invalid';
@@ -28,6 +45,7 @@ pub fn create_intercepted_webview() -> String {
                 type, method,
                 url: urlObj.origin + urlObj.pathname,
                 query: params,
+                headers: headers || null,
                 body: null
             };
 
@@ -43,7 +61,7 @@ pub fn create_intercepted_webview() -> String {
                 }
             }
 
-            safeInvoke(JSON.stringify(info));
+            safeInvoke(info);
         } catch (_) {}
     };
 
@@ -61,7 +79,12 @@ pub fn create_intercepted_webview() -> String {
                             const method = (init && init.method) ||
                                            ((input instanceof Request) ? input.method : 'GET');
                             const body = (init && init.body) || null;
-                            log('fetch', String(method).toUpperCase(), url, body);
+                            const headers = (init && init.headers)
+                                ? extractHeaders(init.headers)
+                                : (input instanceof Request)
+                                    ? extractHeaders(input.headers)
+                                    : null;
+                            log('fetch', String(method).toUpperCase(), url, body, headers);
                         } catch (_) {}
                         _busy = false;
                     }
@@ -76,11 +99,24 @@ pub fn create_intercepted_webview() -> String {
         const proto = XMLHttpRequest.prototype;
         const _origOpen = proto.open;
         const _origSend = proto.send;
+        const _origSetHeader = proto.setRequestHeader;
         const xhrMap = new WeakMap();
 
         proto.open = new Proxy(_origOpen, {
             apply(target, thisArg, argsList) {
-                try { xhrMap.set(thisArg, { m: argsList[0], u: argsList[1] }); } catch (_) {}
+                try { xhrMap.set(thisArg, { m: argsList[0], u: argsList[1], h: {} }); } catch (_) {}
+                return Reflect.apply(target, thisArg, argsList);
+            }
+        });
+
+        proto.setRequestHeader = new Proxy(_origSetHeader, {
+            apply(target, thisArg, argsList) {
+                try {
+                    let meta = xhrMap.get(thisArg);
+                    if (!meta) { meta = { m: 'GET', u: '', h: {} }; xhrMap.set(thisArg, meta); }
+                    if (!meta.h) meta.h = {};
+                    meta.h[argsList[0]] = argsList[1];
+                } catch (_) {}
                 return Reflect.apply(target, thisArg, argsList);
             }
         });
@@ -92,7 +128,7 @@ pub fn create_intercepted_webview() -> String {
                     try {
                         const meta = xhrMap.get(thisArg);
                         if (meta) {
-                            log('xhr', String(meta.m || 'GET').toUpperCase(), meta.u || '', argsList[0]);
+                            log('xhr', String(meta.m || 'GET').toUpperCase(), meta.u || '', argsList[0], meta.h || null);
                         }
                     } catch (_) {}
                     _busy = false;
@@ -110,7 +146,7 @@ pub fn create_intercepted_webview() -> String {
                 apply(target, thisArg, argsList) {
                     if (!_busy) {
                         _busy = true;
-                        try { log('beacon', 'POST', argsList[0], argsList[1]); } catch (_) {}
+                        try { log('beacon', 'POST', argsList[0], argsList[1], null); } catch (_) {}
                         _busy = false;
                     }
                     return Reflect.apply(target, thisArg, argsList);
@@ -119,7 +155,7 @@ pub fn create_intercepted_webview() -> String {
         }
     } catch (_) {}
 
-    console.log('[请求拦截] 已启动');
+    console.log('[请求拦截] 已启动 (含 headers)');
 })();
     "#.to_string()
 }

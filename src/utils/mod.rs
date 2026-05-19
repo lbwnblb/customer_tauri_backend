@@ -4,7 +4,8 @@ pub mod platform;
 pub mod constants;
 pub mod logger;
 pub mod http;
-mod feige_resp;
+pub mod feige_resp;
+pub mod protobuf;
 
 pub use app_data::app_data_dir;
 pub use uuid::uuid_no_hyphen;

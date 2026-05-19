@@ -29,6 +29,16 @@ pub fn save_shop_webview(id: &str, shop_name: &str) -> Result<(), rusqlite::Erro
     Ok(())
 }
 
+pub fn update_shop_name(id: &str, shop_name: &str) -> Result<(), rusqlite::Error> {
+    let conn = get_connection()?;
+    create_table(&conn)?;
+    conn.execute(
+        "UPDATE shop_webview SET shop_name = ?1, updated_at = datetime('now', 'localtime') WHERE id = ?2",
+        [shop_name, id],
+    )?;
+    Ok(())
+}
+
 pub fn delete_shop_webview(id: &str) -> Result<(), rusqlite::Error> {
     let conn = get_connection()?;
     create_table(&conn)?;

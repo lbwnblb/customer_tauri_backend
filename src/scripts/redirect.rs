@@ -7,6 +7,18 @@ pub fn douyin_redirect(webview_id: &str) -> String {
 
     console.log(LOG_PREFIX, '脚本注入完成, 当前URL:', lastUrl);
 
+    function handleBackendTask(task) {
+        console.log(LOG_PREFIX, '收到任务:', JSON.stringify(task));
+        switch (task.shop_task_type) {
+            case 1:
+                console.log(LOG_PREFIX, '收到类型1任务:', task.data_str);
+                break;
+            default:
+                console.log(LOG_PREFIX, '收到未知类型任务:', task.shop_task_type, task.data_str);
+                break;
+        }
+    }
+
     function tryRegisterChannel() {
         if (window.__shopChannelRegistered) return;
         if (!window.__TAURI__ || !window.__TAURI__.core) {
@@ -19,7 +31,7 @@ pub fn douyin_redirect(webview_id: &str) -> String {
         try {
             var channel = new window.__TAURI__.core.Channel();
             channel.onmessage = function(data) {
-                console.log(LOG_PREFIX, '收到任务:', JSON.stringify(data));
+                handleBackendTask(data);
             };
             window.__TAURI__.core.invoke('add_shop_channel', {
                 channel: channel,

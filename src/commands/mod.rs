@@ -5,3 +5,4 @@ pub mod platform;
 pub mod shop;
 pub mod webview_utils;
 pub mod shop_channel;
+pub mod ws_handler;
