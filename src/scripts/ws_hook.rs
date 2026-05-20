@@ -21,7 +21,7 @@ pub fn create_ws_hook() -> String {
   }
 
   function emit(event, detail = {}) {
-    invoke('on_ws', { event: { event: ev, ...detail, timestamp: Date.now() } });
+    invoke('on_ws', { event: { event, ...detail, timestamp: Date.now() } });
   }
 
   window.WebSocket = function (url, protocols) {
@@ -43,13 +43,6 @@ pub fn create_ws_hook() -> String {
       emit('message', { direction: 'incoming', dataType: t.type, payload: t.payload });
     });
 
-    const origSend = ws.send.bind(ws);
-    ws.send = async function (data) {
-      const t = await toTransferable(data);
-      emit('message', { direction: 'outgoing', dataType: t.type, payload: t.payload });
-      return origSend(data);
-    };
-
     ws.addEventListener('open', () => emit('open', meta));
     ws.addEventListener('close', (e) => emit('close', { code: e.code, reason: e.reason, ...meta }));
     ws.addEventListener('error', () => emit('error', meta));
@@ -64,5 +57,5 @@ pub fn create_ws_hook() -> String {
   window.WebSocket.CLOSED = 3;
 })();
 "#
-    .to_string()
+        .to_string()
 }

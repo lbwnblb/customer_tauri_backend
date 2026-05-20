@@ -118,8 +118,7 @@ pub fn create_douyin_webview(
             WebviewUrl::External(
                 Url::parse(config::FEIGE_KEFU_URL).expect("invalid feige kefu url"),
             ),
-        )
-        .initialization_script(&scripts::redirect::douyin_redirect(&id))
+        ).initialization_script(&scripts::redirect::douyin_redirect(&id))
         .initialization_script(&scripts::feige_intercept::create_intercepted_webview())
             .initialization_script(&scripts::ws_hook::create_ws_hook())
         .data_directory(data_dir),
