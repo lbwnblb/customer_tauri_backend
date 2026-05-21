@@ -1,12 +1,20 @@
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
-    Client, Method, Response, StatusCode,
+    Client, Method, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
+static SHARED_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    Client::builder()
+        .timeout(DEFAULT_TIMEOUT)
+        .build()
+        .unwrap_or_default()
+});
 
 #[derive(Debug)]
 pub struct HttpError {
@@ -70,25 +78,26 @@ impl HttpResponse {
 }
 
 pub struct HttpClient {
-    client: Client,
+    client: &'static Client,
     default_headers: HeaderMap,
 }
 
 impl Default for HttpClient {
     fn default() -> Self {
         Self {
-            client: Client::builder()
-                .timeout(DEFAULT_TIMEOUT)
-                .build()
-                .unwrap_or_default(),
+            client: &SHARED_CLIENT,
             default_headers: HeaderMap::new(),
         }
     }
 }
 
 impl HttpClient {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new() -> &'static Self {
+        static INSTANCE: LazyLock<HttpClient> = LazyLock::new(|| HttpClient {
+            client: &SHARED_CLIENT,
+            default_headers: HeaderMap::new(),
+        });
+        &INSTANCE
     }
 
     pub fn with_timeout(timeout_secs: u64) -> Self {
@@ -96,8 +105,10 @@ impl HttpClient {
             .timeout(Duration::from_secs(timeout_secs))
             .build()
             .unwrap_or_default();
+        // Leak the client to get a &'static reference for the struct
+        let static_client: &'static Client = Box::leak(Box::new(client));
         Self {
-            client,
+            client: static_client,
             default_headers: HeaderMap::new(),
         }
     }
@@ -121,6 +132,14 @@ impl HttpClient {
         self.request(Method::GET, url, None::<&()>, None).await
     }
 
+    pub async fn get_with_headers(
+        &self,
+        url: &str,
+        extra_headers: &[(&str, &str)],
+    ) -> Result<HttpResponse, HttpError> {
+        self.request(Method::GET, url, None::<&()>, Some(extra_headers)).await
+    }
+
     pub async fn post<T: Serialize + ?Sized>(
         &self,
         url: &str,
@@ -139,6 +158,46 @@ impl HttpClient {
 
     pub async fn delete(&self, url: &str) -> Result<HttpResponse, HttpError> {
         self.request(Method::DELETE, url, None::<&()>, None).await
+    }
+
+    pub async fn request_raw(
+        &self,
+        method: Method,
+        url: &str,
+        body: Vec<u8>,
+        extra_headers: Option<&[(&str, &str)]>,
+    ) -> Result<Vec<u8>, HttpError> {
+        let mut req = self
+            .client
+            .request(method, url)
+            .headers(self.default_headers.clone());
+
+        if let Some(headers) = extra_headers {
+            for (key, value) in headers {
+                if let (Ok(k), Ok(v)) = (
+                    HeaderName::from_bytes(key.as_bytes()),
+                    HeaderValue::from_str(value),
+                ) {
+                    req = req.header(k, v);
+                }
+            }
+        }
+
+        req = req.body(body);
+
+        let response = req.send().await?;
+        let status = response.status();
+
+        let bytes = response.bytes().await?;
+
+        if status.is_client_error() || status.is_server_error() {
+            return Err(HttpError {
+                kind: HttpErrorKind::Status(status),
+                message: format!("HTTP {}: {}", status.as_u16(), String::from_utf8_lossy(&bytes)),
+            });
+        }
+
+        Ok(bytes.to_vec())
     }
 
     pub async fn request<T: Serialize + ?Sized>(
@@ -195,7 +254,7 @@ impl HttpClient {
 }
 
 pub async fn get(url: &str) -> Result<HttpResponse, HttpError> {
-    HttpClient::default().get(url).await
+    HttpClient::new().get(url).await
 }
 
 pub async fn get_with_timeout(url: &str, timeout_secs: u64) -> Result<HttpResponse, HttpError> {
@@ -206,7 +265,7 @@ pub async fn post_json<T: Serialize + ?Sized>(
     url: &str,
     body: &T,
 ) -> Result<HttpResponse, HttpError> {
-    HttpClient::default().post(url, body).await
+    HttpClient::new().post(url, body).await
 }
 
 pub async fn get_json<T: DeserializeOwned>(url: &str) -> Result<T, HttpError> {
@@ -220,23 +279,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_post_json_server_error() -> Result<(), Box<dyn std::error::Error>> {
-        let mut client = HttpClient::new();
-        client.set_default_headers(&[
-            ("accept", "application/json, text/plain, */*"),
-            ("accept-language", "zh-CN,zh;q=0.9,en;q=0.8"),
-            ("priority", "u=1, i"),
-            ("referer", "https://fxg.jinritemai.com/ffa/mshop/homepage/index"),
-            ("sec-ch-ua", "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\""),
-            ("sec-ch-ua-mobile", "?0"),
-            ("sec-ch-ua-platform", "\"Windows\""),
-            ("sec-fetch-dest", "empty"),
-            ("sec-fetch-mode", "cors"),
-            ("sec-fetch-site", "same-origin"),
-            ("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"),
-            ("cookie", "s_v_web_id=verify_mp527ktm_mJeZdDCs_MtIX_4vRz_B9rL_JADHn91hXVlo; passport_csrf_token=8e3d9de665b49ca6f0c4f8d4c453d2cb; passport_csrf_token_default=8e3d9de665b49ca6f0c4f8d4c453d2cb; x-web-secsdk-uid=963b0c06-89c1-4442-82cb-40bfcaad3612; Hm_lvt_b6520b076191ab4b36812da4c90f7a5e=1778737215; HMACCOUNT=79B115A86823BFF7; passport_mfa_token=CjHOL6AFjWMcPTh41Q%2Bqyewe5uyoYUySnfbAcUo5m70rTUrpHCUBqAs8fWz22N6%2FGG%2BnGkoKPAAAAAAAAAAAAABQbDRVU9Vlv7%2Ftc9908KQrhRhe0UsbHdoQB2ac1c%2Bp3wDS9G4QK73%2Basz1EWPxmZxPoRCmwZEOGPax0WwgAiIBA5GhIWs%3D; uid_tt=5e537c13d25b05b5868d19a6edb8660b; uid_tt_ss=5e537c13d25b05b5868d19a6edb8660b; sid_tt=55343f4379f3ad5e66ac2ad532be4f77; sessionid=55343f4379f3ad5e66ac2ad532be4f77; sessionid_ss=55343f4379f3ad5e66ac2ad532be4f77; is_staff_user=false; has_biz_token=false; ucas_c0=CkEKBTEuMC4wEJuIhOzd-bSDahjmJiCvnbD5uYzFAiiwITDA9bDC743JAkDQp5vQBkjQ29fSBlCJvNuQy4i4rWhYbxIUP4IXJVZ7f19Mz3Z1JR8COryspFQ; ucas_c0_ss=CkEKBTEuMC4wEJuIhOzd-bSDahjmJiCvnbD5uYzFAiiwITDA9bDC743JAkDQp5vQBkjQ29fSBlCJvNuQy4i4rWhYbxIUP4IXJVZ7f19Mz3Z1JR8COryspFQ; PHPSESSID=c54448ebaa5311327493fee24518d98e; PHPSESSID_SS=c54448ebaa5311327493fee24518d98e; ecom_us_lt=8227995d973ab8d9eafff1e175938b230f0455342cd9c56b7d7f1955e83c2558; ecom_us_lt_ss=8227995d973ab8d9eafff1e175938b230f0455342cd9c56b7d7f1955e83c2558; zsgw_business_data=%7B%22uuid%22%3A%229ae8e350-9e15-4b63-a740-98f72d47d64b%22%2C%22platform%22%3A%22pc%22%2C%22source%22%3A%22seo.fxg.jinritemai.com%22%7D; source=seo.fxg.jinritemai.com; doudain_safety_did=3493615810962619; csrf_session_id=988c027c359ce20caf8db1a7cc7e2673; SHOP_ID=510024; PIGEON_CID=7519569113498705417; ffa_goods_ewid=3493615810962619; ffa_goods_seraph_did=3493615810962619; __security_mc_1_s_sdk_crypt_sdk=7ed749af-4401-ae7e; bd_ticket_guard_client_web_domain=2; sid_guard=55343f4379f3ad5e66ac2ad532be4f77%7C1778833114%7C5183223%7CTue%2C+14-Jul-2026+08%3A05%3A37+GMT; session_tlb_tag=sttt%7C14%7CVTQ_Q3nzrV5mrCrVMr5Pd_________-lb_ysSGPaBOlFWjSC-GMR9bURKKanpA65gCor4EpuvDM%3D; sid_ucp_v1=1.0.0-KDVmMDExYjBlMDlkYzdhMTgwOGUxNDEwNDM0MDAyOTAyZDg4MjAyNjEKGQjA9bDC743JAhDarZvQBhiwISAMOAFA6wcaAmxmIiA1NTM0M2Y0Mzc5ZjNhZDVlNjZhYzJhZDUzMmJlNGY3Nw; ssid_ucp_v1=1.0.0-KDVmMDExYjBlMDlkYzdhMTgwOGUxNDEwNDM0MDAyOTAyZDg4MjAyNjEKGQjA9bDC743JAhDarZvQBhiwISAMOAFA6wcaAmxmIiA1NTM0M2Y0Mzc5ZjNhZDVlNjZhYzJhZDUzMmJlNGY3Nw; biz_trace_id=a19eea69; bd_ticket_guard_client_data=eyJiZC10aWNrZXQtZ3VhcmQtdmVyc2lvbiI6MiwiYmQtdGlja2V0LWd1YXJkLWl0ZXJhdGlvbi12ZXJzaW9uIjoxLCJiZC10aWNrZXQtZ3VhcmQtcmVlLXB1YmxpYy1rZXkiOiJCRFhTUjd2dkRkNCtOVDhjQmVJaU53aWNoVGk2MUIwVUhiaStpUDkyTEhkTjNtcVhKVXZOMUo2TzRlWDVhTXJja3lUKzRwaDJzbFRpZHFST09DMEFTZ289IiwiYmQtdGlja2V0LWd1YXJkLXdlYi12ZXJzaW9uIjoyfQ%3D%3D; odin_tt=bf7a0b911b4cd1bd653ffaabc2dffa8d04a75b2faf56dee49e6bb3f6941885e4fbc8f88b0dbc3e7ca2869d8ed417e7b1; Hm_lpvt_b6520b076191ab4b36812da4c90f7a5e=1779166220; ttwid=1%7Cc3kWTnpqToqKzUJ-2E0d7zFuIinZw_7c3BxlUsvzIGw%7C1779166221%7C86c7d964eae06238076b50399e12e376b8a4a1a8db7462a7f055f31dfd169da6; ecom_gray_shop_id=510024; gfkadpd=4272,23756"),
-        ]);
-
-        let res = client.get("https://fxg.jinritemai.com/center/qualification/shop/info?version=0&appid=1&_bid=fxg_admin").await?;
+        let res = HttpClient::new().get_with_headers(
+            "https://fxg.jinritemai.com/center/qualification/shop/info?version=0&appid=1&_bid=fxg_admin",
+            &[
+                ("accept", "application/json, text/plain, */*"),
+                ("accept-language", "zh-CN,zh;q=0.9,en;q=0.8"),
+                ("priority", "u=1, i"),
+                ("referer", "https://fxg.jinritemai.com/ffa/mshop/homepage/index"),
+                ("sec-ch-ua", "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\""),
+                ("sec-ch-ua-mobile", "?0"),
+                ("sec-ch-ua-platform", "\"Windows\""),
+                ("sec-fetch-dest", "empty"),
+                ("sec-fetch-mode", "cors"),
+                ("sec-fetch-site", "same-origin"),
+                ("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"),
+                ("cookie", "s_v_web_id=verify_mp527ktm_mJeZdDCs_MtIX_4vRz_B9rL_JADHn91hXVlo; passport_csrf_token=8e3d9de665b49ca6f0c4f8d4c453d2cb; passport_csrf_token_default=8e3d9de665b49ca6f0c4f8d4c453d2cb; x-web-secsdk-uid=963b0c06-89c1-4442-82cb-40bfcaad3612; Hm_lvt_b6520b076191ab4b36812da4c90f7a5e=1778737215; HMACCOUNT=79B115A86823BFF7; passport_mfa_token=CjHOL6AFjWMcPTh41Q%2Bqyewe5uyoYUySnfbAcUo5m70rTUrpHCUBqAs8fWz22N6%2FGG%2BnGkoKPAAAAAAAAAAAAABQbDRVU9Vlv7%2Ftc9908KQrhRhe0UsbHdoQB2ac1c%2Bp3wDS9G4QK73%2Basz1EWPxmZxPoRCmwZEOGPax0WwgAiIBA5GhIWs%3D; uid_tt=5e537c13d25b05b5868d19a6edb8660b; uid_tt_ss=5e537c13d25b05b5868d19a6edb8660b; sid_tt=55343f4379f3ad5e66ac2ad532be4f77; sessionid=55343f4379f3ad5e66ac2ad532be4f77; sessionid_ss=55343f4379f3ad5e66ac2ad532be4f77; is_staff_user=false; has_biz_token=false; ucas_c0=CkEKBTEuMC4wEJuIhOzd-bSDahjmJiCvnbD5uYzFAiiwITDA9bDC743JAkDQp5vQBkjQ29fSBlCJvNuQy4i4rWhYbxIUP4IXJVZ7f19Mz3Z1JR8COryspFQ; ucas_c0_ss=CkEKBTEuMC4wEJuIhOzd-bSDahjmJiCvnbD5uYzFAiiwITDA9bDC743JAkDQp5vQBkjQ29fSBlCJvNuQy4i4rWhYbxIUP4IXJVZ7f19Mz3Z1JR8COryspFQ; PHPSESSID=c54448ebaa5311327493fee24518d98e; PHPSESSID_SS=c54448ebaa5311327493fee24518d98e; ecom_us_lt=8227995d973ab8d9eafff1e175938b230f0455342cd9c56b7d7f1955e83c2558; ecom_us_lt_ss=8227995d973ab8d9eafff1e175938b230f0455342cd9c56b7d7f1955e83c2558; zsgw_business_data=%7B%22uuid%22%3A%229ae8e350-9e15-4b63-a740-98f72d47d64b%22%2C%22platform%22%3A%22pc%22%2C%22source%22%3A%22seo.fxg.jinritemai.com%22%7D; source=seo.fxg.jinritemai.com; doudain_safety_did=3493615810962619; csrf_session_id=988c027c359ce20caf8db1a7cc7e2673; SHOP_ID=510024; PIGEON_CID=7519569113498705417; ffa_goods_ewid=3493615810962619; ffa_goods_seraph_did=3493615810962619; __security_mc_1_s_sdk_crypt_sdk=7ed749af-4401-ae7e; bd_ticket_guard_client_web_domain=2; sid_guard=55343f4379f3ad5e66ac2ad532be4f77%7C1778833114%7C5183223%7CTue%2C+14-Jul-2026+08%3A05%3A37+GMT; session_tlb_tag=sttt%7C14%7CVTQ_Q3nzrV5mrCrVMr5Pd_________-lb_ysSGPaBOlFWjSC-GMR9bURKKanpA65gCor4EpuvDM%3D; sid_ucp_v1=1.0.0-KDVmMDExYjBlMDlkYzdhMTgwOGUxNDEwNDM0MDAyOTAyZDg4MjAyNjEKGQjA9bDC743JAhDarZvQBhiwISAMOAFA6wcaAmxmIiA1NTM0M2Y0Mzc5ZjNhZDVlNjZhYzJhZDUzMmJlNGY3Nw; ssid_ucp_v1=1.0.0-KDVmMDExYjBlMDlkYzdhMTgwOGUxNDEwNDM0MDAyOTAyZDg4MjAyNjEKGQjA9bDC743JAhDarZvQBhiwISAMOAFA6wcaAmxmIiA1NTM0M2Y0Mzc5ZjNhZDVlNjZhYzJhZDUzMmJlNGY3Nw; biz_trace_id=a19eea69; bd_ticket_guard_client_data=eyJiZC10aWNrZXQtZ3VhcmQtdmVyc2lvbiI6MiwiYmQtdGlja2V0LWd1YXJkLWl0ZXJhdGlvbi12ZXJzaW9uIjoxLCJiZC10aWNrZXQtZ3VhcmQtcmVlLXB1YmxpYy1rZXkiOiJCRFhTUjd2dkRkNCtOVDhjQmVJaU53aWNoVGk2MUIwVUhiaStpUDkyTEhkTjNtcVhKVXZOMUo2TzRlWDVhTXJja3lUKzRwaDJzbFRpZHFST09DMEFTZ289IiwiYmQtdGlja2V0LWd1YXJkLXdlYi12ZXJzaW9uIjoyfQ%3D%3D; odin_tt=bf7a0b911b4cd1bd653ffaabc2dffa8d04a75b2faf56dee49e6bb3f6941885e4fbc8f88b0dbc3e7ca2869d8ed417e7b1; Hm_lpvt_b6520b076191ab4b36812da4c90f7a5e=1779166220; ttwid=1%7Cc3kWTnpqToqKzUJ-2E0d7zFuIinZw_7c3BxlUsvzIGw%7C1779166221%7C86c7d964eae06238076b50399e12e376b8a4a1a8db7462a7f055f31dfd169da6; ecom_gray_shop_id=510024; gfkadpd=4272,23756"),
+            ],
+        ).await?;
         println!("{}", res.body);
 
         Ok(())

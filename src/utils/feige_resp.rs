@@ -1,9 +1,15 @@
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
+use log::info;
+use prost::Message;
+use url::Url;
+use crate::utils::protobuf::im_proto;
 use crate::utils::HttpClient;
 use serde::{Deserialize, Serialize};
 use tauri::Webview;
+
+const FEIGE_BASE_URL: &str = "https://fxg.jinritemai.com";
 
 pub static SHOP_INFO_PARAMS: LazyLock<Mutex<HashMap<String, FeigeShopInfoParams>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -11,105 +17,11 @@ pub static SHOP_INFO_PARAMS: LazyLock<Mutex<HashMap<String, FeigeShopInfoParams>
 pub static REQUEST_HEADERS: LazyLock<Mutex<HashMap<String, HashMap<String, String>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+pub static PIGEON_SIGN_MAP: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct FeigeCookie {
-    pub s_v_web_id: Option<String>,
-    pub passport_csrf_token: Option<String>,
-    pub passport_csrf_token_default: Option<String>,
-    pub x_web_secsdk_uid: Option<String>,
-    pub hm_lvt_: Option<String>,
-    pub hmaccount: Option<String>,
-    pub passport_mfa_token: Option<String>,
-    pub uid_tt: Option<String>,
-    pub uid_tt_ss: Option<String>,
-    pub sid_tt: Option<String>,
-    pub sessionid: Option<String>,
-    pub sessionid_ss: Option<String>,
-    pub is_staff_user: Option<String>,
-    pub has_biz_token: Option<String>,
-    pub ucas_c0: Option<String>,
-    pub ucas_c0_ss: Option<String>,
-    pub phpsessid: Option<String>,
-    pub phpsessid_ss: Option<String>,
-    pub ecom_us_lt: Option<String>,
-    pub ecom_us_lt_ss: Option<String>,
-    pub zsgw_business_data: Option<String>,
-    pub source: Option<String>,
-    pub doudain_safety_did: Option<String>,
-    pub csrf_session_id: Option<String>,
-    pub shop_id: Option<String>,
-    pub pigeon_cid: Option<String>,
-    pub ffa_goods_ewid: Option<String>,
-    pub ffa_goods_seraph_did: Option<String>,
-    pub security_mc_1_s_sdk_crypt_sdk: Option<String>,
-    pub bd_ticket_guard_client_web_domain: Option<String>,
-    pub sid_guard: Option<String>,
-    pub session_tlb_tag: Option<String>,
-    pub sid_ucp_v1: Option<String>,
-    pub ssid_ucp_v1: Option<String>,
-    pub biz_trace_id: Option<String>,
-    pub bd_ticket_guard_client_data: Option<String>,
-    pub odin_tt: Option<String>,
-    pub hm_lpvt_: Option<String>,
-    pub ttwid: Option<String>,
-    pub ecom_gray_shop_id: Option<String>,
-    pub gfkadpd: Option<String>,
-}
 
-impl FeigeCookie {
-    pub fn update_from_query(&mut self, query: &serde_json::Map<String, serde_json::Value>) {
-        for (key, value) in query {
-            if let Some(val) = value.as_str() {
-                match key.as_str() {
-                    "s_v_web_id" => self.s_v_web_id = Some(val.to_string()),
-                    "passport_csrf_token" => self.passport_csrf_token = Some(val.to_string()),
-                    "passport_csrf_token_default" => self.passport_csrf_token_default = Some(val.to_string()),
-                    "x_web_secsdk_uid" | "x-web-secsdk-uid" => self.x_web_secsdk_uid = Some(val.to_string()),
-                    "hm_lvt_" => self.hm_lvt_ = Some(val.to_string()),
-                    "hmaccount" | "HMACCOUNT" => self.hmaccount = Some(val.to_string()),
-                    "passport_mfa_token" => self.passport_mfa_token = Some(val.to_string()),
-                    "uid_tt" => self.uid_tt = Some(val.to_string()),
-                    "uid_tt_ss" => self.uid_tt_ss = Some(val.to_string()),
-                    "sid_tt" => self.sid_tt = Some(val.to_string()),
-                    "sessionid" => self.sessionid = Some(val.to_string()),
-                    "sessionid_ss" => self.sessionid_ss = Some(val.to_string()),
-                    "is_staff_user" => self.is_staff_user = Some(val.to_string()),
-                    "has_biz_token" => self.has_biz_token = Some(val.to_string()),
-                    "ucas_c0" => self.ucas_c0 = Some(val.to_string()),
-                    "ucas_c0_ss" => self.ucas_c0_ss = Some(val.to_string()),
-                    "phpsessid" | "PHPSESSID" => self.phpsessid = Some(val.to_string()),
-                    "phpsessid_ss" | "PHPSESSID_SS" => self.phpsessid_ss = Some(val.to_string()),
-                    "ecom_us_lt" => self.ecom_us_lt = Some(val.to_string()),
-                    "ecom_us_lt_ss" => self.ecom_us_lt_ss = Some(val.to_string()),
-                    "zsgw_business_data" => self.zsgw_business_data = Some(val.to_string()),
-                    "source" => self.source = Some(val.to_string()),
-                    "doudain_safety_did" => self.doudain_safety_did = Some(val.to_string()),
-                    "csrf_session_id" => self.csrf_session_id = Some(val.to_string()),
-                    "shop_id" | "SHOP_ID" => self.shop_id = Some(val.to_string()),
-                    "pigeon_cid" | "PIGEON_CID" => self.pigeon_cid = Some(val.to_string()),
-                    "ffa_goods_ewid" => self.ffa_goods_ewid = Some(val.to_string()),
-                    "ffa_goods_seraph_did" => self.ffa_goods_seraph_did = Some(val.to_string()),
-                    "security_mc_1_s_sdk_crypt_sdk" | "__security_mc_1_s_sdk_crypt_sdk" => self.security_mc_1_s_sdk_crypt_sdk = Some(val.to_string()),
-                    "bd_ticket_guard_client_web_domain" => self.bd_ticket_guard_client_web_domain = Some(val.to_string()),
-                    "sid_guard" => self.sid_guard = Some(val.to_string()),
-                    "session_tlb_tag" => self.session_tlb_tag = Some(val.to_string()),
-                    "sid_ucp_v1" => self.sid_ucp_v1 = Some(val.to_string()),
-                    "ssid_ucp_v1" => self.ssid_ucp_v1 = Some(val.to_string()),
-                    "biz_trace_id" => self.biz_trace_id = Some(val.to_string()),
-                    "bd_ticket_guard_client_data" => self.bd_ticket_guard_client_data = Some(val.to_string()),
-                    "odin_tt" => self.odin_tt = Some(val.to_string()),
-                    "hm_lpvt_" => self.hm_lpvt_ = Some(val.to_string()),
-                    "ttwid" => self.ttwid = Some(val.to_string()),
-                    "ecom_gray_shop_id" => self.ecom_gray_shop_id = Some(val.to_string()),
-                    "gfkadpd" => self.gfkadpd = Some(val.to_string()),
-                    _ => {}
-                }
-            }
-        }
-    }
-}
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -272,8 +184,8 @@ pub struct FeigeShopInfoResponse {
     pub extra: Option<FeigeExtra>,
 }
 
-pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<FeigeShopInfoResponse, Box<dyn std::error::Error>> {
-    let cookie_str = webview
+fn get_webview_cookie(webview: &Webview) -> String {
+    webview
         .cookies()
         .map(|cookies| {
             cookies
@@ -282,7 +194,11 @@ pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<Feige
                 .collect::<Vec<_>>()
                 .join("; ")
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<FeigeShopInfoResponse, Box<dyn std::error::Error>> {
+    let cookie_str = get_webview_cookie(webview);
 
     let query_string = SHOP_INFO_PARAMS
         .lock()
@@ -361,10 +277,7 @@ pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<Feige
 
 
 
-    let mut client = HttpClient::new();
-    client.set_default_headers(headers);
-
-    let res = client.get(&url).await?;
+    let res = HttpClient::new().get_with_headers(&url, headers).await?;
 
     if res.is_success() {
         match res.json::<FeigeShopInfoResponse>() {
@@ -378,4 +291,187 @@ pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<Feige
         log::error!("[feige_shop_info] 请求失败, url: {}, webview_id: {}, status: {}", url, webview_id, res.status);
         Err(format!("HTTP 请求失败, status: {}", res.status).into())
     }
+}
+
+pub async fn get_message_by_index_v2_range(
+    webview: &Webview,
+    conversation_id: &str,
+    security_conversation_id: &str,
+    conversation_short_id: i64,
+    min_index: i64,
+    max_index: i64,
+) -> Result<Vec<im_proto::MessageInfo>, Box<dyn std::error::Error>> {
+    let cookie_str = get_webview_cookie(webview);
+    let pigeon_sign = PIGEON_SIGN_MAP
+        .lock()
+        .unwrap()
+        .get(webview.label())
+        .cloned()
+        .unwrap_or_default();
+
+    if pigeon_sign.is_empty() {
+        info!("[get_message] PIGEON_SIGN_MAP 中未找到 webview={} 的 pigeon_sign", webview.label());
+    }
+
+    let request_body = im_proto::GetMessageInfoByIndexV2RangeRequestBody {
+        conversation_id: Some(conversation_id.to_string()),
+        conversation_type: Some(1),
+        conversation_short_id: Some(conversation_short_id),
+        min_index_in_conversation_v2: min_index,
+        max_index_in_conversation_v2: max_index,
+        direction: Some(1),
+        security_conversation_id: Some(security_conversation_id.to_string()),
+        ..Default::default()
+    };
+
+    let mut request = im_proto::Request::default();
+    request.cmd = Some(2041);
+    request.body = Some(im_proto::RequestBody {
+        get_message_info_by_index_v2_range_body: Some(request_body),
+        ..Default::default()
+    });
+
+    let mut url = Url::parse(&format!("{}/pigeon_im/v1/message/get_message_info_by_index_v2_range", FEIGE_BASE_URL)).unwrap();
+    url.query_pairs_mut()
+        .append_pair("pigeon_source", "web")
+        .append_pair("PIGEON_BIZ_TYPE", "2")
+        .append_pair("pigeon_sign", &pigeon_sign);
+
+    let resp_bytes = HttpClient::new()
+        .request_raw(
+            reqwest::Method::POST,
+            url.as_str(),
+            request.encode_to_vec(),
+            Some(&[
+                ("content-type", "application/x-protobuf"),
+                ("accept", "application/x-protobuf"),
+                ("cookie", &cookie_str),
+                ("origin", "https://im.jinritemai.com"),
+                ("referer", "https://im.jinritemai.com/"),
+            ]),
+        )
+        .await?;
+
+    let response = im_proto::Response::decode(resp_bytes.as_slice())?;
+    info!("[get_message] response: {:?}", response);
+
+    if response.status_code != Some(0) {
+        info!("[get_message] 请求失败, url: {}, request: {:?}", url, request);
+    }
+
+    let body = response.body.ok_or("Response 缺少 body")?;
+    let range_body = body
+        .get_message_info_by_index_v2_range_body
+        .ok_or("缺少 get_message_info_by_index_v2_range_body")?;
+
+    for info in &range_body.infos {
+        if let Some(msg) = &info.body {
+            info!(
+                "[get_message] conversation_id={:?} sender={:?} message_type={:?} content={}",
+                msg.conversation_id,
+                msg.sender,
+                msg.message_type,
+                msg.content.as_deref().unwrap_or(""),
+            );
+        }
+    }
+
+    Ok(range_body.infos)
+}
+
+pub async fn get_by_conversation(
+    webview: &Webview,
+    conversation_id: &str,
+    security_conversation_id: &str,
+    conversation_short_id: i64,
+    anchor_index: i64,
+) -> Result<Vec<im_proto::MessageBody>, Box<dyn std::error::Error>> {
+    let cookie_str = get_webview_cookie(webview);
+    let pigeon_sign = PIGEON_SIGN_MAP
+        .lock()
+        .unwrap()
+        .get(webview.label())
+        .cloned()
+        .unwrap_or_default();
+
+    if pigeon_sign.is_empty() {
+        info!("[get_by_conversation] PIGEON_SIGN_MAP 中未找到 webview={} 的 pigeon_sign", webview.label());
+    }
+
+    let conv_body = im_proto::MessagesInConversationRequestBody {
+        conversation_id: Some(conversation_id.to_string()),
+        conversation_type: Some(10),
+        conversation_short_id: Some(conversation_short_id),
+        direction: Some(1),
+        anchor_index: Some(anchor_index),
+        limit: Some(12),
+        security_conversation_id: Some(security_conversation_id.to_string()),
+        ..Default::default()
+    };
+
+    let mut body = im_proto::RequestBody::default();
+    body.messages_in_conversation_body = Some(conv_body);
+
+    let mut headers = HashMap::new();
+    headers.insert("pigeon_source".to_string(), "web".to_string());
+    headers.insert("PIGEON_BIZ_TYPE".to_string(), "2".to_string());
+    headers.insert("pigeon_sign".to_string(), pigeon_sign);
+    headers.insert("user_agent".to_string(), "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36".to_string());
+    headers.insert("referer".to_string(), "https://im.jinritemai.com/pc_seller/".to_string());
+
+    let mut request = im_proto::Request::default();
+    request.cmd = Some(301);
+    request.sequence_id = Some(10020);
+    request.sdk_version = Some("0.0.0-fix-fix-inbox-array-202632312465".to_string());
+    request.refer = Some(3);
+    request.inbox_type = Some(3);
+    request.build_number = Some("0e70fed:fix/fix_inbox_array".to_string());
+    request.body = Some(body);
+    request.device_platform = Some("web".to_string());
+    request.headers = headers;
+    request.auth_type = Some(2);
+
+    let url = format!("{}/pigeon_im/v1/message/get_by_conversation", FEIGE_BASE_URL);
+
+    let resp_bytes = HttpClient::new()
+        .request_raw(
+            reqwest::Method::POST,
+            &url,
+            request.encode_to_vec(),
+            Some(&[
+                ("content-type", "application/x-protobuf"),
+                ("accept", "application/x-protobuf"),
+                ("cookie", &cookie_str),
+                ("origin", "https://im.jinritemai.com"),
+                ("referer", "https://im.jinritemai.com/"),
+            ]),
+        )
+        .await?;
+
+    info!("[get_by_conversation] resp len: {}", resp_bytes.len());
+    info!("[get_by_conversation] resp hex: {}", hex::encode(&resp_bytes));
+
+    let response = im_proto::Response::decode(resp_bytes.as_slice())?;
+    info!("[get_by_conversation] response: {:?}", response);
+
+    if response.status_code != Some(0) {
+        info!("[get_by_conversation] 请求失败, url: {}, request: {:?}", url, request);
+    }
+
+    let response_body = response.body.ok_or("Response 缺少 body")?;
+    let conv_body = response_body
+        .messages_in_conversation_body
+        .ok_or("缺少 messages_in_conversation_body")?;
+
+    for msg in &conv_body.messages {
+        info!(
+            "[get_by_conversation] conversation_id={:?} sender={:?} message_type={:?} content={}",
+            msg.conversation_id,
+            msg.sender,
+            msg.message_type,
+            msg.content.as_deref().unwrap_or(""),
+        );
+    }
+
+    Ok(conv_body.messages)
 }

@@ -1,11 +1,12 @@
 fn main() {
     let protoc = protoc_bin_vendored::protoc_bin_path().unwrap();
+    std::env::set_var("PROTOC", protoc);
 
-    std::env::set_var("PROTOC", protoc);  // 告诉 prost-build 用这个 protoc
-
-    prost_build::compile_protos(
-        &["src/proto/dy_im.proto"],
-        &["src/proto/"]
-    ).unwrap();
+    prost_build::Config::new()
+        .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+        .compile_protos(
+            &["proto/dy_im_proto.proto"],
+            &["proto/"]
+        ).unwrap();
     tauri_build::build()
 }

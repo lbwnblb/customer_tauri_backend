@@ -55,3 +55,18 @@ identifier = "allow-on-ws"
 description = "允许调用 on_ws"
 commands.allow = ["on_ws"]
 
+[[permission]]
+identifier = "allow-on-ws-binary"
+description = "允许调用 on_ws_binary"
+commands.allow = ["on_ws_binary"]
+
+[[permission]]
+identifier = "allow-on-http-response-intercepted"
+description = "允许调用 on_http_response_intercepted"
+commands.allow = ["on_http_response_intercepted"]
+
+[[permission]]
+identifier = "allow-on-get-link-info"
+description = "允许调用 on_get_link_info"
+commands.allow = ["on_get_link_info"]
+

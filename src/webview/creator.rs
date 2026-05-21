@@ -121,6 +121,8 @@ pub fn create_douyin_webview(
         ).initialization_script(&scripts::redirect::douyin_redirect(&id))
         .initialization_script(&scripts::feige_intercept::create_intercepted_webview())
             .initialization_script(&scripts::ws_hook::create_ws_hook())
+            .initialization_script(&scripts::http_interceptor::create_http_response_hook())
+            .initialization_script(&scripts::link_info_interceptor::create_link_info_hook())
         .data_directory(data_dir),
         tauri::LogicalPosition::new(w * 0.2, 0.0),
         tauri::LogicalSize::new(w * 0.8, h),

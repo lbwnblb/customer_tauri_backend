@@ -1,6 +1,8 @@
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use crate::utils::protobuf::feige_im_proto;
+use tauri::{Webview, ipc::{InvokeBody, Request}};
 
 /// 前端统一发过来的结构，event 区分类型，其余字段按需取
 #[derive(Debug, Deserialize)]
@@ -23,6 +25,20 @@ pub struct WsEvent {
 }
 
 #[tauri::command]
+pub fn on_ws_binary(webview: Webview, request: Request) {
+    let bytes: Vec<u8> = match request.body() {
+        InvokeBody::Raw(data) => data.clone(),
+        InvokeBody::Json(_val) => {
+            info!("[WS] on_ws_binary 收到非 Raw body，跳过");
+            return;
+        }
+    };
+
+    tauri::async_runtime::spawn(async move {
+        feige_im_proto(&webview, &bytes).await;
+    });
+}
+#[tauri::command]
 pub fn on_ws(event: WsEvent) {
     match event.event.as_str() {
         "connect" => {
@@ -38,15 +54,7 @@ pub fn on_ws(event: WsEvent) {
             info!("[WS] 连接错误");
         }
         "message" => {
-            let dir = event.direction.as_deref().unwrap_or("?");
-            let dtype = event.data_type.as_deref().unwrap_or("?");
-            let payload = event.payload.as_deref().unwrap_or("");
-
-            // 只关心收到的消息
-            if dir == "incoming" {
-                info!("[WS] ← {} ({}) {} bytes", dir, dtype, payload.len());
-                // TODO: 在这里解析 protobuf、匹配规则、触发自动化
-            }
+            info!("[WS] 收到消息: {}", event.payload.as_deref().unwrap_or(""));
         }
         other => {
             info!("[WS] 未知事件: {}", other);

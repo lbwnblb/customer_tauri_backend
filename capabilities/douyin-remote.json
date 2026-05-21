@@ -12,6 +12,8 @@
     "core:default",
     "allow-add-shop-channel",
     "allow-on-request",
-    "allow-on-ws"
+    "allow-on-ws",
+    "allow-on-http-response-intercepted",
+    "allow-on-get-link-info"
   ]
 }

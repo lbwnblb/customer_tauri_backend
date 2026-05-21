@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package im_proto;
+package dy_im_proto;
 
 // ==================== Enums ====================
 

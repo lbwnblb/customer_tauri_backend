@@ -13,3 +13,4 @@ pub use platform::{is_douyin_platform, is_pinduoduo_platform, get_platform_from_
 pub use constants::{PLATFORM_DOUYIN, PLATFORM_PINDUODUO, PLATFORM_UNKNOWN};
 pub use logger::init_logger;
 pub use http::{get, get_json, get_with_timeout, post_json, HttpClient, HttpError, HttpErrorKind, HttpResponse};
+pub use feige_resp::{get_message_by_index_v2_range, get_by_conversation};
