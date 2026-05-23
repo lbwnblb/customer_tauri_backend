@@ -7,7 +7,7 @@ use crate::webview::creator::create_douyin_webview;
 /// `create_douyin_webview` 内部已经处理:
 /// - 把当前激活的 08 webview 停到角落(不调用 hide,保持 visible 状态)
 /// - 新创建的 webview 直接占据可视区,成为 active
-pub fn open_douyin_shop(window: Window) -> Result<(), String> {
+pub fn open_douyin_shop(window: &Window) -> Result<(), String> {
     let scale = window.scale_factor().unwrap_or(1.0);
     let size = window.inner_size().unwrap();
     let w = size.width as f64 / scale;

@@ -2,7 +2,6 @@ use tauri::{Manager, Window};
 use serde::{Deserialize, Serialize};
 use crate::database::{get_all_shops, delete_shop_webview, ShopWebview};
 use crate::utils::{app_data_dir, get_platform_from_id, is_douyin_platform, PLATFORM_DOUYIN, PLATFORM_PINDUODUO};
-use crate::commands::index_channel::{send_task, Task, TASK_TYPE_FETCH_SHOP_LIST};
 use crate::commands::webview_utils::{activate_08_webview, get_active_08};
 use crate::webview::creator::{create_douyin_webview, create_platform_webview, get_webview_ids, has_webview, remove_webview_id};
 
@@ -122,12 +121,21 @@ pub async fn add_shop(window: Window, platform: ShopPlatform) {
     match platform.platform.as_str() {
         s if s == PLATFORM_DOUYIN => {
             log::info!("选择抖音小店");
-            match crate::webview::douyin_shop::open_douyin_shop(window) {
+            match crate::webview::douyin_shop::open_douyin_shop(&window) {
                 Ok(_) => {
-                    send_task(Task {
-                        r#type: 1,
-                        task_type: TASK_TYPE_FETCH_SHOP_LIST.to_string(),
-                    });
+                    match window.get_webview("02_app") {
+                        None => {}
+                        Some(webview) => {
+                            match webview.eval("fetchShopList()") {
+                                Ok(()) => {
+                                    log::info!("[shop_name_callback] 获取店铺列表成功");
+                                }
+                                Err(e) => {
+                                    log::error!("[shop_name_callback] 获取店铺列表失败: {}", e);
+                                }
+                            };
+                        }
+                    };
                 }
                 Err(e) => log::error!("[add_shop] {e}"),
             }

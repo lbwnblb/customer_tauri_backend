@@ -13,7 +13,10 @@
     "allow-add-shop-channel",
     "allow-on-request",
     "allow-on-ws",
+    "allow-on-ws-recv",
+    "allow-on-ws-send",
     "allow-on-http-response-intercepted",
+    "allow-shop-name-callback",
     "allow-on-get-link-info"
   ]
 }

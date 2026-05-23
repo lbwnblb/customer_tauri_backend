@@ -61,9 +61,24 @@ description = "允许调用 on_ws_binary"
 commands.allow = ["on_ws_binary"]
 
 [[permission]]
+identifier = "allow-on-ws-recv"
+description = "允许调用 on_ws_recv"
+commands.allow = ["on_ws_recv"]
+
+[[permission]]
+identifier = "allow-on-ws-send"
+description = "允许调用 on_ws_send"
+commands.allow = ["on_ws_send"]
+
+[[permission]]
 identifier = "allow-on-http-response-intercepted"
 description = "允许调用 on_http_response_intercepted"
 commands.allow = ["on_http_response_intercepted"]
+
+[[permission]]
+identifier = "allow-shop-name-callback"
+description = "允许调用 shop_name_callback"
+commands.allow = ["shop_name_callback"]
 
 [[permission]]
 identifier = "allow-on-get-link-info"

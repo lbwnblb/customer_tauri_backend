@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package dy_im_proto;
+package im_proto;
 
 // ==================== Enums ====================
 
@@ -16,6 +16,7 @@ enum IMCMD {
   NEW_MSG_NOTIFY = 500;
   NEW_P2P_MSG_NOTIFY = 504;
   MARK_CONVERSATION_DELETE = 603;
+  CONVERSATION_PARTICIPANTS_LIST = 605;
   GET_CONVERSATION_INFO_V2 = 608;
   CREATE_CONVERSATION_V2 = 609;
   GET_CONVERSATION_INFO_LIST_V2 = 610;
@@ -25,7 +26,6 @@ enum IMCMD {
   CREATE_SUB_CONVERSATION = 616;
   GET_SUB_CONVERSATION = 617;
   GET_SUB_CONVERSATION_LIST = 618;
-  CONVERSATION_PARTICIPANTS_LIST = 605;
   ADD_CONVERSATION_PARTICIPANTS = 650;
   REMOVE_CONVERSATION_PARTICIPANTS = 651;
   LEAVE_CONVERSATION = 652;
@@ -246,40 +246,6 @@ enum SendType {
   BY_USER = 1;
 }
 
-enum SortType {
-  JOIN_TIME = 1;
-  CREATED_TIME = 2;
-  GROUP_NAME = 3;
-  ACTIVE_TIME = 4;
-}
-
-enum NetworkType {
-  UNKNOWN = 0;
-  WIFI = 1;
-  MOBILE_2G = 2;
-  MOBILE_3G = 3;
-  MOBILE_4G = 4;
-  MOBILE_5G = 5;
-}
-
-enum MsgReportType {
-  NOT_USE = 0;
-  MSG_RECEIVE_BY_WS = 1;
-  MSG_RECEIVE_BY_USER = 2;
-  MSG_RECEIVE_BY_INIT = 3;
-  MSG_RECEIVE_BY_LOAD_HISTORY = 4;
-  MSG_RECEIVE_BY_LOAD_NEWER = 5;
-  MSG_RECEIVE_BY_CHECK_MSG_V1 = 6;
-  MSG_RECEIVE_BY_CHECK_MSG_V2 = 7;
-  MSG_RECEIVE_BY_STRANGER = 8;
-  MSG_SHOW = 9;
-}
-
-enum ClientMetricType {
-  COUNTER = 0;
-  TIMER = 1;
-}
-
 enum MessagePropertyType {
   REACTION = 0;
   SYNC = 1;
@@ -314,6 +280,40 @@ enum MessageStatus {
   DELETED = 4;
 }
 
+enum SortType {
+  JOIN_TIME = 1;
+  CREATED_TIME = 2;
+  GROUP_NAME = 3;
+  ACTIVE_TIME = 4;
+}
+
+enum NetworkType {
+  UNKNOWN = 0;
+  WIFI = 1;
+  MOBILE_2G = 2;
+  MOBILE_3G = 3;
+  MOBILE_4G = 4;
+  MOBILE_5G = 5;
+}
+
+enum MsgReportType {
+  NOT_USE = 0;
+  MSG_RECEIVE_BY_WS = 1;
+  MSG_RECEIVE_BY_USER = 2;
+  MSG_RECEIVE_BY_INIT = 3;
+  MSG_RECEIVE_BY_LOAD_HISTORY = 4;
+  MSG_RECEIVE_BY_LOAD_NEWER = 5;
+  MSG_RECEIVE_BY_CHECK_MSG_V1 = 6;
+  MSG_RECEIVE_BY_CHECK_MSG_V2 = 7;
+  MSG_RECEIVE_BY_STRANGER = 8;
+  MSG_SHOW = 9;
+}
+
+enum ClientMetricType {
+  COUNTER = 0;
+  TIMER = 1;
+}
+
 enum AuthType {
   UNKNOWN_AUTH = 0;
   SESSION_AUTH = 1;
@@ -327,8 +327,6 @@ enum TokenType {
 }
 
 // ==================== Messages ====================
-
-// ==================== Frame ====================
 
 message Frame {
   required uint64 seqid = 1;
@@ -351,11 +349,6 @@ message MuteReadBadgeCountInfo {
   required int32 read_badge_count = 2;
 }
 
-message MuteBadgeCountInfo {
-  required int32 message_type = 1;
-  required int32 badge_count = 2;
-}
-
 message PropertyItem {
   optional int64 uid = 1;
   optional string sec_uid = 2;
@@ -366,16 +359,6 @@ message PropertyItem {
 
 message PropertyItemList {
   repeated PropertyItem Items = 1;
-}
-
-message ReferenceInfo {
-  required int64 referenced_message_id = 1;
-  required string hint = 2;
-  required int64 ref_message_type = 3;
-  required int32 referenced_message_status = 4;
-  optional int64 root_message_id = 5;
-  optional int64 root_message_conv_index = 6;
-  map<string, string> ext = 7;
 }
 
 message MessageBody {
@@ -403,6 +386,16 @@ message MessageBody {
   optional string security_sender = 51;
 }
 
+message ReferenceInfo {
+  required int64 referenced_message_id = 1;
+  required string hint = 2;
+  required int64 ref_message_type = 3;
+  required int32 referenced_message_status = 4;
+  optional int64 root_message_id = 5;
+  optional int64 root_message_conv_index = 6;
+  map<string, string> ext = 7;
+}
+
 message Participant {
   optional int64 user_id = 1;
   optional int64 sort_order = 2;
@@ -423,6 +416,30 @@ message ParticipantsPage {
   repeated Participant participants = 1;
   optional bool has_more = 2;
   optional int64 cursor = 3;
+}
+
+message ConversationInfoV2 {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  optional int32 conversation_type = 3;
+  optional string ticket = 4;
+  // field 5 is skipped
+  optional ParticipantsPage first_page_participants = 6;
+  optional int32 participants_count = 7;
+  optional bool is_participant = 8;
+  optional int32 inbox_type = 9;
+  optional int32 badge_count = 10;
+  repeated MuteBadgeCountInfo mute_badge_count_infos = 11;
+  optional int32 status = 12;
+  optional int64 version = 13;
+  optional Participant user_info = 20;
+  optional ConversationCoreInfo conversation_core_info = 50;
+  optional ConversationSettingInfo conversation_setting_info = 51;
+  optional int64 last_message_indexv2 = 52;
+  optional SubConversation current_sub_conv = 53;
+  optional string security_conversation_id = 54;
+  repeated RobotInfo bots = 60;
+  optional ConvUnreadUnion conv_unread_union = 70;
 }
 
 message RobotInfo {
@@ -458,6 +475,7 @@ message ConversationCoreInfo {
   optional string icon = 7;
   optional int32 inbox_type = 8;
   optional string notice = 9;
+  // field 10 is skipped
   map<string, string> ext = 11;
   optional int64 owner = 12;
   optional string sec_owner = 13;
@@ -496,36 +514,31 @@ message ConversationSettingInfo {
   optional string security_conversation_id = 50;
 }
 
-message ConvUnread {
-  optional int32 badge_count = 1;
-  optional int32 read_badge_count = 2;
+message MessagesPerUserRequestBody {
+  optional int64 cursor = 1;
+  optional int32 limit = 2 [default = 50];
+  optional int64 interval = 3;
+  optional int32 new_user = 4;
+  optional bool reverse = 5;
 }
 
-message ConvUnreadUnion {
-  map<int32, ConvUnread> ConvUnreadInfo = 1;
+message GetOpenConvsRequestBody {
+  optional int64 open_conv_version = 1;
+  optional bool open_conv_reverse = 2;
+  optional int32 open_conv_limit = 3 [default = 50];
 }
 
-message ConversationInfoV2 {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  optional int32 conversation_type = 3;
-  optional string ticket = 4;
-  optional ParticipantsPage first_page_participants = 6;
-  optional int32 participants_count = 7;
-  optional bool is_participant = 8;
-  optional int32 inbox_type = 9;
-  optional int32 badge_count = 10;
-  repeated MuteBadgeCountInfo mute_badge_count_infos = 11;
-  optional int32 status = 12;
-  optional int64 version = 13;
-  optional Participant user_info = 20;
-  optional ConversationCoreInfo conversation_core_info = 50;
-  optional ConversationSettingInfo conversation_setting_info = 51;
-  optional int64 last_message_indexv2 = 52;
-  optional SubConversation current_sub_conv = 53;
-  optional string security_conversation_id = 54;
-  repeated RobotInfo bots = 60;
-  optional ConvUnreadUnion conv_unread_union = 70;
+message GetUserConversationsByTagRequestBody {
+  optional int64 cursor = 1;
+  optional int32 conv_limit = 2 [default = 10];
+  optional bool reverse = 3;
+  optional int32 tag = 4;
+}
+
+message GetUserConversationsByTagResponseBody {
+  repeated ConversationInfoWithMsg conversations = 1;
+  optional int64 next_cursor = 2;
+  optional bool has_more = 3;
 }
 
 message ConversationInfoWithMsg {
@@ -533,6 +546,7 @@ message ConversationInfoWithMsg {
   optional int64 conversation_short_id = 2;
   optional int32 conversation_type = 3;
   optional string ticket = 4;
+  // field 5 is skipped
   optional ParticipantsPage first_page_participants = 6;
   optional int32 participants_count = 7;
   optional bool is_participant = 8;
@@ -553,14 +567,43 @@ message ConversationInfoWithMsg {
   optional MessageBody last_msg_body = 80;
 }
 
-// ==================== Request/Response Bodies ====================
+message SetUserAllConversationsSettingsRequestBody {
+  optional int32 favorite_tag = 1;
+}
 
-message MessagesPerUserRequestBody {
+message SetUserAllConversationsSettingsResponseBody {
+  optional int32 status = 1;
+}
+
+message GetMessagesByUserWithOpenConvsRequestBody {
   optional int64 cursor = 1;
-  optional int32 limit = 2;
+  optional int32 limit = 2 [default = 50];
   optional int64 interval = 3;
   optional int32 new_user = 4;
   optional bool reverse = 5;
+  optional int64 open_conv_version = 21;
+  optional bool open_conv_reverse = 22;
+  optional int32 open_conv_limit = 23 [default = 50];
+}
+
+message GetUserMessageWithOpenConvsRequestBody {
+  optional int64 version = 1;
+  optional int64 cmd_index = 2;
+  optional int64 stranger_version = 3;
+  optional int64 read_version = 4;
+  optional string source = 5;
+  optional int64 consult_version = 6;
+  optional int64 notify_version = 17;
+  optional GetRecentConvAndMsgRequestBody get_recent_conv_and_msg = 18;
+  optional int64 open_conv_version = 21;
+  optional bool open_conv_reverse = 22;
+  optional int32 open_conv_limit = 23 [default = 50];
+}
+
+message GetRecentConvAndMsgRequestBody {
+  optional int64 left_side = 1;
+  optional int64 right_side = 2;
+  optional int32 direction = 3 [default = 1];
 }
 
 message MessagesPerUserResponseBody {
@@ -572,6 +615,42 @@ message MessagesPerUserResponseBody {
   repeated ConversationBadgeCountInfo conversation_badge_count = 6;
   optional int64 next_cmd_index = 7;
   repeated int64 hasmore_message_conv_list = 8;
+}
+
+message GetOpenConvsResponseBody {
+  optional int64 next_openconv_version = 1;
+  optional bool open_conv_has_more = 2;
+  repeated OpenConvsBody open_convs = 3;
+}
+
+message GetMessagesByUserWithOpenConvsResponseBody {
+  repeated MessageBody messages = 1;
+  optional int64 next_cursor = 2;
+  optional bool has_more = 3;
+  optional int64 next_interval = 4;
+  optional int64 next_conversation_version = 5;
+  repeated ConversationBadgeCountInfo conversation_badge_count = 6;
+  optional int64 next_cmd_index = 7;
+  repeated int64 hasmore_message_conv_list = 8;
+  optional GetOpenConvsResponseBody open_convs_body = 21;
+}
+
+message GetUserMessageWithOpenConvsResponseBody {
+  optional GetRecentMessageRespBody messages = 1;
+  optional GetCmdMessageRespBody cmd_messages = 2;
+  optional bool has_stranger_message = 3;
+  optional ConversationReadInfoRespBody read_info = 4;
+  optional ConsultGetConversationListResponseBody consult_messages = 5;
+  optional NotifyGetConversationListResponseBody notify_messages = 16;
+  optional GetOpenConvsResponseBody open_convs_body = 21;
+}
+
+message OpenConvsBody {
+  optional int64 parent_con_short_id = 1;
+  optional int64 sub_con_short_id = 2;
+  optional int32 parent_conv_type = 3;
+  optional string parent_con_id = 4;
+  optional string security_parent_con_id = 10;
 }
 
 message ConversationBadgeCountInfo {
@@ -596,7 +675,7 @@ message MessagesPerUserInitV2ResponseBody {
   optional int64 per_user_cursor = 3;
   optional int64 next_cursor = 4;
   optional bool has_more = 5;
-  optional int32 init_type = 6;
+  optional int32 init_type = 6 [default = 1];
   optional int64 cmd_start_index = 7;
   optional int64 next_conversation_version = 8;
   optional int64 readconv_version = 9;
@@ -606,9 +685,9 @@ message MessagesInConversationRequestBody {
   optional string conversation_id = 1;
   optional int32 conversation_type = 2;
   optional int64 conversation_short_id = 3;
-  optional int32 direction = 4;
+  optional int32 direction = 4 [default = 1];
   optional int64 anchor_index = 5;
-  optional int32 limit = 6;
+  optional int32 limit = 6 [default = 50];
   optional int64 max_index = 7;
   repeated IndexSkipRange index_skip_ranges = 8;
   optional int64 sub_conversation_short_id = 9;
@@ -621,17 +700,49 @@ message MessagesInConversationResponseBody {
   optional bool has_more = 3;
 }
 
-message IndexSkipRange {
-  optional int64 start_index = 1;
-  optional int64 end_index = 2;
+message ParticipantWithProperty {
+  optional int64 user_id = 1;
+  optional string biz_role = 2;
+  optional string group_symbol = 3;
+  optional string security_user_id = 10;
+}
+
+message CreateConversationV2RequestBody {
+  optional int32 conversation_type = 1;
+  repeated int64 participants = 2;
+  optional bool persistent = 3;
+  optional string idempotent_id = 4;
+  // field 5 is skipped
+  optional string name = 6;
+  optional string avatar_url = 7;
+  optional string description = 8;
+  // fields 9-10 are skipped
+  map<string, string> biz_ext = 11;
+  optional string unuse_field1 = 12;
+  repeated ParticipantWithProperty participants_obj = 20;
+  repeated string security_participants = 21;
+  optional string security_idempotent_id = 22;
+}
+
+message CreateConversationV2ResponseBody {
+  optional ConversationInfoV2 conversation = 1;
+  optional int64 check_code = 2;
+  optional string check_message = 3;
+  optional string extra_info = 4;
+  optional int32 status = 5;
 }
 
 message SendUserActionRequestBody {
   optional string conversation_id = 1;
   optional int32 conversation_type = 2;
   optional int64 conversation_short_id = 3;
-  optional int32 action_type = 4;
+  optional int32 action_type = 4 [default = 1];
   map<string, string> extra = 5;
+}
+
+message SendUserActionResponseBody {
+  optional int32 action_type = 1 [default = 1];
+  repeated ImActionInfo actions = 2;
 }
 
 message ImActionInfo {
@@ -641,181 +752,15 @@ message ImActionInfo {
   map<string, string> ext_data = 4;
 }
 
-message SendUserActionResponseBody {
-  optional int32 action_type = 1;
-  repeated ImActionInfo actions = 2;
-}
-
 message SendInputStatusRequestBody {
   optional string conversation_id = 1;
   optional int32 conversation_type = 2;
   optional int64 conversation_short_id = 3;
-  optional int32 status = 4;
+  optional int32 status = 4 [default = 3];
   map<string, string> extra = 5;
 }
 
-message DeleteConversationRequestBody {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  optional int32 conversation_type = 3;
-  optional int64 last_message_index = 4;
-  optional int64 last_message_index_v2 = 5;
-  optional int32 badge_count = 6;
-  repeated MuteBadgeCountInfo mute_badge_count_infos = 7;
-  optional string security_conversation_id = 21;
-}
-
-message DissolveConversationRequestBody {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  optional int32 conversation_type = 3;
-}
-
-message MarkConversationReadRequestBody {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  optional int32 conversation_type = 3;
-  optional int64 read_message_index = 4;
-  optional int64 conv_unread_count = 5;
-  optional int64 total_unread_count = 6;
-  optional int64 read_message_index_v2 = 7;
-  optional int32 read_badge_count = 8;
-  optional string ticket = 9;
-  optional int64 server_message_id = 10;
-  repeated MuteReadBadgeCountInfo mute_read_badge_count_infos = 11;
-  optional int64 sub_conversation_short_id = 12;
-  optional string security_conversation_id = 21;
-}
-
-message GetConversationParticipantsReadIndexV3RequestBody {
-  optional int64 conversation_short_id = 1;
-  optional int32 conversation_type = 2;
-  optional string conversation_id = 3;
-  repeated int64 user_ids = 4;
-  optional string security_conversation_id = 10;
-  repeated string security_user_ids = 11;
-}
-
-message ParticipantReadIndex {
-  optional int64 user_id = 1;
-  optional string sec_uid = 2;
-  optional int64 index = 3;
-  optional int64 index_v2 = 4;
-  optional int64 index_min = 5;
-  optional int64 group_index = 6;
-  optional string security_user_id = 20;
-}
-
-message GetConversationParticipantsReadIndexV3ResponseBody {
-  repeated ParticipantReadIndex indexes = 1;
-}
-
-message GetConversationParticipantsReadIndexRequestParam {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  repeated int64 user_ids = 4;
-  optional string security_conversation_id = 10;
-  repeated string security_user_ids = 11;
-}
-
-message BatchGetConversationParticipantsReadIndexRequestBody {
-  repeated string conversation_id = 1;
-  repeated int64 conversation_short_id = 2;
-  optional string request_from = 3;
-  optional bool min_index_required = 4;
-  optional int32 conversation_type = 5;
-  repeated GetConversationParticipantsReadIndexRequestParam params = 6;
-}
-
-message ConversationParticipantReadIndex {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  repeated ParticipantReadIndex participantReadIndex = 3;
-  optional string security_conversation_id = 10;
-}
-
-message GetConversationParticipantsMinIndexV3RequestBody {
-  optional int64 conversation_short_id = 1;
-  optional int32 conversation_type = 2;
-  optional string conversation_id = 3;
-  optional string security_conversation_id = 10;
-}
-
-message ParticipantMinIndex {
-  optional int64 user_id = 1;
-  optional string sec_uid = 2;
-  optional int64 index = 3;
-  optional int64 index_v2 = 4;
-  optional string security_user_id = 10;
-}
-
-message GetConversationParticipantsMinIndexV3ResponseBody {
-  repeated ParticipantMinIndex indexes = 1;
-}
-
-message GetTicketRequestBody {
-  optional int32 ticket_type = 1;
-  optional int32 conversation_type = 2;
-  optional int64 to_id = 4;
-  optional int64 conversation_short_id = 5;
-  optional int32 customed_conversation_type = 6;
-  optional string security_to_id = 7;
-  map<string, string> ext = 10;
-}
-
-message GetTicketResponseBody {
-  optional string ticket = 1;
-}
-
-message GetUserConversationListRequestBody {
-  optional int32 sort_type = 1;
-  optional int64 cursor = 2;
-  optional int32 con_type = 3;
-  optional int64 limit = 4;
-  optional int32 include_role = 5;
-  optional int32 exclude_role = 6;
-  optional bool include_removed_group = 7;
-  optional bool with_cold = 8;
-  optional int32 customed_con_type = 9;
-  optional int32 push_status = 10;
-}
-
-message GetUserConversationListResponseBody {
-  repeated ConversationInfoV2 list = 1;
-  optional bool has_more = 2;
-  optional int64 next_cursor = 3;
-}
-
-message ClientACKRequestBody {
-  required int64 start_time_stamp = 1;
-  required int32 cmd = 2;
-  optional int32 network_type = 3;
-  optional string logid = 4;
-  optional int64 client_time_stamp = 5;
-  optional int64 server_message_id = 6;
-  optional int32 type = 7;
-}
-
-message ClientACKResponseBody {}
-
-message ClientMetric {
-  optional int32 metric_type = 1;
-  optional string k = 2;
-  optional int64 v = 3;
-  map<string, string> tags = 4;
-}
-
-message ReportClientMetricsRequestBody {
-  repeated ClientMetric report_metrics_list = 1;
-}
-
-message ReportClientMetricsResponseBody {}
-
-message GetConfigsRequestBody {}
-
-message Config {
-  optional string conf_name = 1;
-  optional string conf_value = 2;
+message GetConfigsRequestBody {
 }
 
 message GetConfigsResponseBody {
@@ -823,10 +768,15 @@ message GetConfigsResponseBody {
   repeated Config configs = 2;
 }
 
+message Config {
+  optional string conf_name = 1;
+  optional string conf_value = 2;
+}
+
 message ConvCountReport {
   optional int64 conv_short_id = 1;
   optional int64 unread_count = 2;
-  optional int32 conversation_type = 3;
+  optional int32 conversation_type = 3 [default = 1];
   optional int32 customed_conversation_type = 4;
 }
 
@@ -854,14 +804,113 @@ message GetUnreadCountResponseBody {
   repeated int64 failed_conv_list = 3;
 }
 
-message ModifyMessageExtRequestBody {
-  required int64 conversation_short_id = 1;
-  required int64 message_id = 2;
-  required string ticket = 3;
-  map<string, string> ext = 4;
+message DeleteConversationRequestBody {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  optional int32 conversation_type = 3;
+  optional int64 last_message_index = 4;
+  optional int64 last_message_index_v2 = 5;
+  optional int32 badge_count = 6;
+  repeated MuteBadgeCountInfo mute_badge_count_infos = 7;
+  optional string security_conversation_id = 21;
 }
 
-message ModifyMessageExtResponseBody {}
+message DissolveConversationRequestBody {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  optional int32 conversation_type = 3;
+}
+
+message DeleteMessageRequestBody {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  optional int32 conversation_type = 3;
+  optional int64 message_id = 4;
+  optional string security_conversation_id = 10;
+}
+
+message MarkConversationReadRequestBody {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  optional int32 conversation_type = 3;
+  optional int64 read_message_index = 4;
+  optional int64 conv_unread_count = 5;
+  optional int64 total_unread_count = 6;
+  optional int64 read_message_index_v2 = 7;
+  optional int32 read_badge_count = 8;
+  optional string ticket = 9;
+  optional int64 server_message_id = 10;
+  repeated MuteReadBadgeCountInfo mute_read_badge_count_infos = 11;
+  optional int64 sub_conversation_short_id = 12;
+  optional string security_conversation_id = 21;
+}
+
+message GetConversationParticipantsReadIndexV3RequestBody {
+  optional int64 conversation_short_id = 1;
+  optional int32 conversation_type = 2;
+  optional string conversation_id = 3;
+  repeated int64 user_ids = 4;
+  optional string security_conversation_id = 10;
+  repeated string security_user_ids = 11;
+}
+
+message GetConversationParticipantsReadIndexV3ResponseBody {
+  repeated ParticipantReadIndex indexes = 1;
+}
+
+message GetConversationParticipantsReadIndexRequestParam {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  // field 3 is skipped
+  repeated int64 user_ids = 4;
+  optional string security_conversation_id = 10;
+  repeated string security_user_ids = 11;
+}
+
+message BatchGetConversationParticipantsReadIndexRequestBody {
+  repeated string conversation_id = 1;
+  repeated int64 conversation_short_id = 2;
+  optional string request_from = 3;
+  optional bool min_index_required = 4;
+  optional int32 conversation_type = 5;
+  repeated GetConversationParticipantsReadIndexRequestParam params = 6;
+}
+
+message ConversationParticipantReadIndex {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  repeated ParticipantReadIndex participantReadIndex = 3;
+  optional string security_conversation_id = 10;
+}
+
+message ParticipantReadIndex {
+  optional int64 user_id = 1;
+  optional string sec_uid = 2;
+  optional int64 index = 3;
+  optional int64 index_v2 = 4;
+  optional int64 index_min = 5;
+  optional int64 group_index = 6;
+  optional string security_user_id = 20;
+}
+
+message GetConversationParticipantsMinIndexV3RequestBody {
+  optional int64 conversation_short_id = 1;
+  optional int32 conversation_type = 2;
+  optional string conversation_id = 3;
+  optional string security_conversation_id = 10;
+}
+
+message GetConversationParticipantsMinIndexV3ResponseBody {
+  repeated ParticipantMinIndex indexes = 1;
+}
+
+message ParticipantMinIndex {
+  optional int64 user_id = 1;
+  optional string sec_uid = 2;
+  optional int64 index = 3;
+  optional int64 index_v2 = 4;
+  optional string security_user_id = 10;
+}
 
 message SendMessageP2PRequestBody {
   optional int32 send_type = 1;
@@ -884,14 +933,6 @@ message SendMessageP2PResponseBody {
   repeated int64 failed_user = 1;
 }
 
-message ReferencedMessageInfo {
-  required int64 referenced_message_id = 1;
-  required string hint = 2;
-  optional int64 root_message_id = 3;
-  optional int64 root_message_conv_index = 4;
-  map<string, string> ext = 5;
-}
-
 message SendMessageRequestBody {
   optional string conversation_id = 1;
   optional int32 conversation_type = 2;
@@ -910,6 +951,14 @@ message SendMessageRequestBody {
   optional string security_conversation_id = 50;
   repeated string security_mentioned_users = 51;
   optional string security_to_user_id = 52;
+}
+
+message ReferencedMessageInfo {
+  required int64 referenced_message_id = 1;
+  required string hint = 2;
+  optional int64 root_message_id = 3;
+  optional int64 root_message_conv_index = 4;
+  map<string, string> ext = 5;
 }
 
 message SendMessageResponseBody {
@@ -934,7 +983,13 @@ message ModifyMessageRequestBody {
   optional string ticket = 6;
 }
 
-message ModifyMessageResponseBody {}
+message ModifyMessageResponseBody {
+}
+
+message MuteBadgeCountInfo {
+  required int32 message_type = 1;
+  required int32 badge_count = 2;
+}
 
 message MsgTrace {
   map<int32, int64> metrics = 1;
@@ -942,9 +997,10 @@ message MsgTrace {
 }
 
 message NewMessageNotify {
+  // field 1 is skipped
   optional string conversation_id = 2;
   optional int32 conversation_type = 3;
-  optional int32 notify_type = 4;
+  optional int32 notify_type = 4 [default = 1];
   optional MessageBody message = 5;
   optional int64 previous_cursor = 6;
   optional int64 next_cursor = 7;
@@ -984,12 +1040,12 @@ message NewP2PMessageNotify {
 
 message ConversationsPerUserByFavoriteV2RequestBody {
   optional int64 cursor = 1;
-  optional int32 limit = 2;
+  optional int32 limit = 2 [default = 500];
 }
 
 message ConversationsPerUserByTopV2RequestBody {
   optional int64 cursor = 1;
-  optional int32 limit = 2;
+  optional int32 limit = 2 [default = 500];
   optional int32 conversation_type = 3;
 }
 
@@ -1030,36 +1086,6 @@ message GetConversationInfoListByTopV2ResponseBody {
   optional int64 next_cursor = 3;
 }
 
-message ParticipantWithProperty {
-  optional int64 user_id = 1;
-  optional string biz_role = 2;
-  optional string group_symbol = 3;
-  optional string security_user_id = 10;
-}
-
-message CreateConversationV2RequestBody {
-  optional int32 conversation_type = 1;
-  repeated int64 participants = 2;
-  optional bool persistent = 3;
-  optional string idempotent_id = 4;
-  optional string name = 6;
-  optional string avatar_url = 7;
-  optional string description = 8;
-  map<string, string> biz_ext = 11;
-  optional string unuse_field1 = 12;
-  repeated ParticipantWithProperty participants_obj = 20;
-  repeated string security_participants = 21;
-  optional string security_idempotent_id = 22;
-}
-
-message CreateConversationV2ResponseBody {
-  optional ConversationInfoV2 conversation = 1;
-  optional int64 check_code = 2;
-  optional string check_message = 3;
-  optional string extra_info = 4;
-  optional int32 status = 5;
-}
-
 message CreateSubConversationRequestBody {
   optional int64 con_short_id = 1;
   optional string con_id = 2;
@@ -1069,14 +1095,6 @@ message CreateSubConversationRequestBody {
   optional string security_con_id = 12;
 }
 
-message CreateSubConversationResponseBody {
-  optional SubConversation sub_conversation = 1;
-  optional int64 check_code = 2;
-  optional string check_message = 3;
-  optional string extra_info = 4;
-  optional int32 status = 5;
-}
-
 message GetSubConversationRequestBody {
   optional int64 con_short_id = 1;
   optional string con_id = 2;
@@ -1084,10 +1102,6 @@ message GetSubConversationRequestBody {
   optional bool include_participants = 4;
   repeated string biz_roles = 5;
   optional string security_con_id = 10;
-}
-
-message GetSubConversationResponseBody {
-  optional SubConversation sub_conversation = 1;
 }
 
 message GetSubConversationListRequestParam {
@@ -1103,15 +1117,39 @@ message GetSubConversationListRequestBody {
   optional bool include_participants = 2;
 }
 
-message GetSubConversationListResponseBody {
-  repeated SubConversation sub_conversation_list = 1;
-}
-
 message ConversationCheckInfo {
   optional int64 conversation_short_id = 1;
   optional string conversation_id = 2;
   optional int32 conversation_type = 3;
   optional string security_conversation_id = 10;
+}
+
+message CreateSubConversationResponseBody {
+  optional SubConversation sub_conversation = 1;
+  optional int64 check_code = 2;
+  optional string check_message = 3;
+  optional string extra_info = 4;
+  optional int32 status = 5;
+}
+
+message GetSubConversationResponseBody {
+  optional SubConversation sub_conversation = 1;
+}
+
+message GetSubConversationListResponseBody {
+  repeated SubConversation sub_conversation_list = 1;
+}
+
+message RecallMessageRequestBody {
+  optional string conversation_id = 1;
+  optional int64 conversation_short_id = 2;
+  optional int32 conversation_type = 3;
+  optional int64 server_message_id = 4;
+  optional int64 sub_conversation_short_id = 5;
+}
+
+message RecallMessageResponseBody {
+  optional string toast = 1;
 }
 
 message ConversationAddParticipantsRequestBody {
@@ -1166,7 +1204,7 @@ message ConversationParticipantsListRequestBody {
   optional int64 conversation_short_id = 2;
   optional int32 conversation_type = 3;
   optional int64 cursor = 4;
-  optional int32 limit = 5;
+  optional int32 limit = 5 [default = 100];
   repeated string biz_roles = 6;
   optional string security_conversation_id = 20;
 }
@@ -1192,52 +1230,6 @@ message UpdateConversationParticipantResponseBody {
   optional string extra_info = 3;
   optional int64 check_code = 4;
   optional string check_message = 5;
-}
-
-message DeleteMessageRequestBody {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  optional int32 conversation_type = 3;
-  optional int64 message_id = 4;
-  optional string security_conversation_id = 10;
-}
-
-message RecallMessageRequestBody {
-  optional string conversation_id = 1;
-  optional int64 conversation_short_id = 2;
-  optional int32 conversation_type = 3;
-  optional int64 server_message_id = 4;
-  optional int64 sub_conversation_short_id = 5;
-}
-
-message RecallMessageResponseBody {
-  optional string toast = 1;
-}
-
-message ModifyPropertyContent {
-  optional int32 operation = 1;
-  optional string key = 2;
-  optional string value = 3;
-  optional string idempotent_id = 4;
-}
-
-message ModifyPropertyBody {
-  optional string conversation_id = 1;
-  optional int32 conversation_type = 2;
-  optional int64 conversation_short_id = 3;
-  optional int64 server_message_id = 4;
-  optional string client_message_id = 5;
-  repeated ModifyPropertyContent modify_property_content = 6;
-}
-
-message ModifyMessagePropertyRequestBody {
-  optional ModifyPropertyBody property_list = 1;
-  optional string ticket = 2;
-}
-
-message ModifyMessagePropertyResponseBody {
-  optional int32 status = 1;
-  optional int64 version = 2;
 }
 
 message GetConversationCoreInfoRequestBody {
@@ -1323,6 +1315,108 @@ message UpsertConversationSettingExtInfoResponseBody {
   optional string extra_info = 5;
 }
 
+message ModifyPropertyContent {
+  optional int32 operation = 1;
+  optional string key = 2;
+  optional string value = 3;
+  optional string idempotent_id = 4;
+}
+
+message ModifyPropertyBody {
+  optional string conversation_id = 1;
+  optional int32 conversation_type = 2;
+  optional int64 conversation_short_id = 3;
+  optional int64 server_message_id = 4;
+  optional string client_message_id = 5;
+  repeated ModifyPropertyContent modify_property_content = 6;
+}
+
+message ModifyMessagePropertyRequestBody {
+  optional ModifyPropertyBody property_list = 1;
+  optional string ticket = 2;
+}
+
+message ModifyMessagePropertyResponseBody {
+  optional int32 status = 1;
+  optional int64 version = 2;
+}
+
+message GetTicketRequestBody {
+  optional int32 ticket_type = 1 [default = 1];
+  optional int32 conversation_type = 2 [default = 1];
+  // field 3 is skipped
+  optional int64 to_id = 4;
+  optional int64 conversation_short_id = 5;
+  optional int32 customed_conversation_type = 6;
+  optional string security_to_id = 7;
+  map<string, string> ext = 10;
+}
+
+message GetTicketResponseBody {
+  optional string ticket = 1;
+}
+
+message GetUserConversationListRequestBody {
+  optional int32 sort_type = 1 [default = 1];
+  optional int64 cursor = 2;
+  optional int32 con_type = 3 [default = 1];
+  optional int64 limit = 4;
+  optional int32 include_role = 5;
+  optional int32 exclude_role = 6;
+  optional bool include_removed_group = 7;
+  optional bool with_cold = 8;
+  optional int32 customed_con_type = 9;
+  optional int32 push_status = 10;
+}
+
+message GetUserConversationListResponseBody {
+  repeated ConversationInfoV2 list = 1;
+  optional bool has_more = 2;
+  optional int64 next_cursor = 3;
+}
+
+message ClientACKRequestBody {
+  required int64 start_time_stamp = 1;
+  required int32 cmd = 2;
+  optional int32 network_type = 3;
+  optional string logid = 4;
+  optional int64 client_time_stamp = 5;
+  optional int64 server_message_id = 6;
+  optional int32 type = 7;
+}
+
+message ClientACKResponseBody {
+}
+
+message ClientMetric {
+  optional int32 metric_type = 1;
+  optional string k = 2;
+  optional int64 v = 3;
+  map<string, string> tags = 4;
+}
+
+message IndexSkipRange {
+  optional int64 start_index = 1;
+  optional int64 end_index = 2;
+}
+
+message ReportClientMetricsRequestBody {
+  repeated ClientMetric report_metrics_list = 1;
+}
+
+message ReportClientMetricsResponseBody {
+}
+
+message ModifyMessageExtRequestBody {
+  required int64 conversation_short_id = 1;
+  required int64 message_id = 2;
+  required string ticket = 3;
+  map<string, string> ext = 4;
+}
+
+message ModifyMessageExtResponseBody {
+}
+
 message MessageInfo {
   optional int32 status = 1;
   optional MessageBody body = 2;
@@ -1349,22 +1443,6 @@ message GetMessageByIdRequestBody {
 
 message GetMessageByIdResponseBody {
   optional MessageInfo msg_info = 1;
-}
-
-message GetMessageInfoByIndexV2RangeRequestBody {
-  optional string conversation_id = 1;
-  optional int32 conversation_type = 2;
-  optional int64 conversation_short_id = 3;
-  required int64 min_index_in_conversation_v2 = 4;
-  required int64 max_index_in_conversation_v2 = 5;
-  optional int32 direction = 6;
-  optional string security_conversation_id = 10;
-}
-
-message GetMessageInfoByIndexV2RangeResponseBody {
-  repeated MessageInfo infos = 1;
-  optional int64 next_index_in_conversation_v2 = 2;
-  optional bool has_more = 3;
 }
 
 message ConversationReadInfo {
@@ -1402,6 +1480,7 @@ message ConversationRecentMessage {
   optional int32 badge_count = 4;
   required string conversation_id = 5;
   repeated MessageBody ext_messages = 6;
+  // field 7 is skipped
   optional StrangerInfo stranger_info = 8;
   repeated MuteBadgeCountInfo mute_badge_count_infos = 9;
   repeated HintInfo hint_infos = 10;
@@ -1415,16 +1494,16 @@ message GetRecentMessageReqBody {
   map<string, string> ext = 4;
 }
 
-message GetRecentMessageRespBody {
-  required int64 next_conversation_version = 1;
-  repeated ConversationRecentMessage messages = 2;
-  required bool has_more = 3;
-}
-
 message GetCmdMessageReqBody {
   required int64 cmd_index = 1;
   required string source = 2;
   optional int32 new_user = 3;
+}
+
+message GetRecentMessageRespBody {
+  required int64 next_conversation_version = 1;
+  repeated ConversationRecentMessage messages = 2;
+  required bool has_more = 3;
 }
 
 message GetCmdMessageRespBody {
@@ -1435,18 +1514,20 @@ message GetCmdMessageRespBody {
   optional int64 readconv_version = 5;
 }
 
-message ConsultGetConversationListResponseBody {
-  required int64 next_version = 1;
-  repeated ConversationRecentMessage messages = 2;
-  required bool has_more = 3;
-  required int32 inbox_type = 4;
+message GetMessageInfoByIndexV2RangeRequestBody {
+  optional string conversation_id = 1;
+  optional int32 conversation_type = 2;
+  optional int64 conversation_short_id = 3;
+  required int64 min_index_in_conversation_v2 = 4;
+  required int64 max_index_in_conversation_v2 = 5;
+  optional int32 direction = 6 [default = 1];
+  optional string security_conversation_id = 10;
 }
 
-message NotifyGetConversationListResponseBody {
-  required int64 next_version = 1;
-  repeated ConversationRecentMessage messages = 2;
-  required bool has_more = 3;
-  required int32 inbox_type = 4;
+message GetMessageInfoByIndexV2RangeResponseBody {
+  repeated MessageInfo infos = 1;
+  optional int64 next_index_in_conversation_v2 = 2;
+  optional bool has_more = 3;
 }
 
 message GetUserMessageRequestBody {
@@ -1456,6 +1537,13 @@ message GetUserMessageRequestBody {
   optional int64 read_version = 4;
   required string source = 5;
   optional int64 consult_version = 6;
+}
+
+message NotifyGetConversationListResponseBody {
+  required int64 next_version = 1;
+  repeated ConversationRecentMessage messages = 2;
+  required bool has_more = 3;
+  required int32 inbox_type = 4;
 }
 
 message GetUserMessageResponseBody {
@@ -1473,11 +1561,6 @@ message MessageByInitRequestBody {
   optional int32 msg_limit = 4;
 }
 
-message ConversationMessage {
-  required ConversationInfoV2 conversations = 1;
-  repeated MessageBody messages = 2;
-}
-
 message MessageByInitResponseBody {
   repeated ConversationMessage messages = 1;
   required bool has_more = 2;
@@ -1488,98 +1571,25 @@ message MessageByInitResponseBody {
   optional int64 readconv_version = 7;
 }
 
-message GetOpenConvsRequestBody {
-  optional int64 open_conv_version = 1;
-  optional bool open_conv_reverse = 2;
-  optional int32 open_conv_limit = 3;
+message ConversationMessage {
+  required ConversationInfoV2 conversations = 1;
+  repeated MessageBody messages = 2;
 }
 
-message OpenConvsBody {
-  optional int64 parent_con_short_id = 1;
-  optional int64 sub_con_short_id = 2;
-  optional int32 parent_conv_type = 3;
-  optional string parent_con_id = 4;
-  optional string security_parent_con_id = 10;
+message ConsultGetConversationListResponseBody {
+  required int64 next_version = 1;
+  repeated ConversationRecentMessage messages = 2;
+  required bool has_more = 3;
+  required int32 inbox_type = 4;
 }
 
-message GetOpenConvsResponseBody {
-  optional int64 next_openconv_version = 1;
-  optional bool open_conv_has_more = 2;
-  repeated OpenConvsBody open_convs = 3;
+message ConvUnreadUnion {
+  map<int32, ConvUnread> ConvUnreadInfo = 1;
 }
 
-message GetMessagesByUserWithOpenConvsRequestBody {
-  optional int64 cursor = 1;
-  optional int32 limit = 2;
-  optional int64 interval = 3;
-  optional int32 new_user = 4;
-  optional bool reverse = 5;
-  optional int64 open_conv_version = 21;
-  optional bool open_conv_reverse = 22;
-  optional int32 open_conv_limit = 23;
-}
-
-message GetMessagesByUserWithOpenConvsResponseBody {
-  repeated MessageBody messages = 1;
-  optional int64 next_cursor = 2;
-  optional bool has_more = 3;
-  optional int64 next_interval = 4;
-  optional int64 next_conversation_version = 5;
-  repeated ConversationBadgeCountInfo conversation_badge_count = 6;
-  optional int64 next_cmd_index = 7;
-  repeated int64 hasmore_message_conv_list = 8;
-  optional GetOpenConvsResponseBody open_convs_body = 21;
-}
-
-message GetRecentConvAndMsgRequestBody {
-  optional int64 left_side = 1;
-  optional int64 right_side = 2;
-  optional int32 direction = 3;
-}
-
-message GetUserMessageWithOpenConvsRequestBody {
-  optional int64 version = 1;
-  optional int64 cmd_index = 2;
-  optional int64 stranger_version = 3;
-  optional int64 read_version = 4;
-  optional string source = 5;
-  optional int64 consult_version = 6;
-  optional int64 notify_version = 17;
-  optional GetRecentConvAndMsgRequestBody get_recent_conv_and_msg = 18;
-  optional int64 open_conv_version = 21;
-  optional bool open_conv_reverse = 22;
-  optional int32 open_conv_limit = 23;
-}
-
-message GetUserMessageWithOpenConvsResponseBody {
-  optional GetRecentMessageRespBody messages = 1;
-  optional GetCmdMessageRespBody cmd_messages = 2;
-  optional bool has_stranger_message = 3;
-  optional ConversationReadInfoRespBody read_info = 4;
-  optional ConsultGetConversationListResponseBody consult_messages = 5;
-  optional NotifyGetConversationListResponseBody notify_messages = 16;
-  optional GetOpenConvsResponseBody open_convs_body = 21;
-}
-
-message GetUserConversationsByTagRequestBody {
-  optional int64 cursor = 1;
-  optional int32 conv_limit = 2;
-  optional bool reverse = 3;
-  optional int32 tag = 4;
-}
-
-message GetUserConversationsByTagResponseBody {
-  repeated ConversationInfoWithMsg conversations = 1;
-  optional int64 next_cursor = 2;
-  optional bool has_more = 3;
-}
-
-message SetUserAllConversationsSettingsRequestBody {
-  optional int32 favorite_tag = 1;
-}
-
-message SetUserAllConversationsSettingsResponseBody {
-  optional int32 status = 1;
+message ConvUnread {
+  optional int32 badge_count = 1;
+  optional int32 read_badge_count = 2;
 }
 
 // ==================== Top-level Request/Response ====================
@@ -1639,6 +1649,39 @@ message RequestBody {
   optional SetUserAllConversationsSettingsRequestBody set_user_all_conversations_settings_body = 17002;
 }
 
+message Request {
+  optional int32 cmd = 1;
+  optional int64 sequence_id = 2;
+  optional string sdk_version = 3;
+  optional string token = 4;
+  optional int32 refer = 5;
+  optional int32 inbox_type = 6;
+  optional string build_number = 7;
+  optional RequestBody body = 8;
+  optional string device_id = 9;
+  optional string channel = 10;
+  optional string device_platform = 11;
+  optional string device_type = 12;
+  optional string os_version = 13;
+  optional string version_code = 14;
+  map<string, string> headers = 15;
+  optional int32 config_id = 16;
+  optional TokenInfo token_info = 17;
+  optional int32 auth_type = 18;
+  optional MsgTrace msg_trace = 19;
+  optional int32 retry_count = 20;
+  optional string biz = 21;
+  optional string access = 22;
+}
+
+message TokenInfo {
+  optional int32 mark_id = 1;
+  optional int32 type = 2;
+  optional int32 app_id = 3;
+  optional int64 user_id = 4;
+  optional int64 timestamp = 5;
+}
+
 message ResponseBody {
   optional SendMessageResponseBody send_message_body = 100;
   optional MessagesPerUserResponseBody messages_per_user_body = 200;
@@ -1687,39 +1730,6 @@ message ResponseBody {
   optional GetUserMessageWithOpenConvsResponseBody get_user_message_with_open_convs_body = 16003;
   optional GetUserConversationsByTagResponseBody get_user_conversations_by_tag_body = 17001;
   optional SetUserAllConversationsSettingsResponseBody set_user_all_conversations_settings_body = 17002;
-}
-
-message TokenInfo {
-  optional int32 mark_id = 1;
-  optional int32 type = 2;
-  optional int32 app_id = 3;
-  optional int64 user_id = 4;
-  optional int64 timestamp = 5;
-}
-
-message Request {
-  optional int32 cmd = 1;
-  optional int64 sequence_id = 2;
-  optional string sdk_version = 3;
-  optional string token = 4;
-  optional int32 refer = 5;
-  optional int32 inbox_type = 6;
-  optional string build_number = 7;
-  optional RequestBody body = 8;
-  optional string device_id = 9;
-  optional string channel = 10;
-  optional string device_platform = 11;
-  optional string device_type = 12;
-  optional string os_version = 13;
-  optional string version_code = 14;
-  map<string, string> headers = 15;
-  optional int32 config_id = 16;
-  optional TokenInfo token_info = 17;
-  optional int32 auth_type = 18;
-  optional MsgTrace msg_trace = 19;
-  optional int32 retry_count = 20;
-  optional string biz = 21;
-  optional string access = 22;
 }
 
 message Response {

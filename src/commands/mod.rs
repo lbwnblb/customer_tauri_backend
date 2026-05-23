@@ -1,10 +1,9 @@
-pub mod index_channel;
 pub mod greet;
 pub mod on_request;
 pub mod platform;
 pub mod shop;
 pub mod webview_utils;
-pub mod shop_channel;
+pub mod shop_callback;
 pub mod ws_handler;
 pub mod http_response_intercepted;
 pub mod get_link_info;

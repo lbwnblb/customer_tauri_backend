@@ -20,6 +20,14 @@ pub static REQUEST_HEADERS: LazyLock<Mutex<HashMap<String, HashMap<String, Strin
 pub static PIGEON_SIGN_MAP: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// WebSocket 连接时从 URL 拿到的 IM token（protobuf Request.token 字段）
+pub static IM_TOKEN_MAP: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// WebSocket 连接时从 URL 拿到的 device_id（protobuf Request.device_id 字段）
+pub static IM_DEVICE_ID_MAP: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
 
 
 
@@ -381,10 +389,9 @@ pub async fn get_message_by_index_v2_range(
 
 pub async fn get_by_conversation(
     webview: &Webview,
-    conversation_id: &str,
     security_conversation_id: &str,
     conversation_short_id: i64,
-    anchor_index: i64,
+
 ) -> Result<Vec<im_proto::MessageBody>, Box<dyn std::error::Error>> {
     let cookie_str = get_webview_cookie(webview);
     let pigeon_sign = PIGEON_SIGN_MAP
@@ -399,11 +406,11 @@ pub async fn get_by_conversation(
     }
 
     let conv_body = im_proto::MessagesInConversationRequestBody {
-        conversation_id: Some(conversation_id.to_string()),
+        conversation_id: Some("".to_string()),
         conversation_type: Some(10),
         conversation_short_id: Some(conversation_short_id),
         direction: Some(1),
-        anchor_index: Some(anchor_index),
+        anchor_index: Some(0),
         limit: Some(12),
         security_conversation_id: Some(security_conversation_id.to_string()),
         ..Default::default()
@@ -431,6 +438,30 @@ pub async fn get_by_conversation(
     request.headers = headers;
     request.auth_type = Some(2);
 
+    // ⬇️ 关键：从全局 Map 取 token 和 device_id，没有这两个字段服务端会返回 150 参数错误
+    let im_token = IM_TOKEN_MAP
+        .lock()
+        .unwrap()
+        .get(webview.label())
+        .cloned()
+        .unwrap_or_default();
+    let device_id = IM_DEVICE_ID_MAP
+        .lock()
+        .unwrap()
+        .get(webview.label())
+        .cloned()
+        .unwrap_or_default();
+
+    if im_token.is_empty() {
+        info!("[get_by_conversation] ⚠️ IM_TOKEN_MAP 中未找到 webview={} 的 token", webview.label());
+    }
+    if device_id.is_empty() {
+        info!("[get_by_conversation] ⚠️ IM_DEVICE_ID_MAP 中未找到 webview={} 的 device_id", webview.label());
+    }
+
+    request.token = Some(im_token);
+    request.device_id = Some(device_id);
+
     let url = format!("{}/pigeon_im/v1/message/get_by_conversation", FEIGE_BASE_URL);
 
     let resp_bytes = HttpClient::new()
@@ -448,11 +479,11 @@ pub async fn get_by_conversation(
         )
         .await?;
 
-    info!("[get_by_conversation] resp len: {}", resp_bytes.len());
-    info!("[get_by_conversation] resp hex: {}", hex::encode(&resp_bytes));
+    // info!("[get_by_conversation] resp len: {}", resp_bytes.len());
+    // info!("[get_by_conversation] resp hex: {}", hex::encode(&resp_bytes));
 
     let response = im_proto::Response::decode(resp_bytes.as_slice())?;
-    info!("[get_by_conversation] response: {:?}", response);
+    // info!("[get_by_conversation] response: {:?}", response);
 
     if response.status_code != Some(0) {
         info!("[get_by_conversation] 请求失败, url: {}, request: {:?}", url, request);
