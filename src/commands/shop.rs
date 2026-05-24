@@ -1,9 +1,9 @@
-use tauri::{Manager, Window};
+use tauri::{Manager, Webview, Window};
 use serde::{Deserialize, Serialize};
 use crate::database::{get_all_shops, delete_shop_webview, ShopWebview};
-use crate::utils::{app_data_dir, get_platform_from_id, is_douyin_platform, PLATFORM_DOUYIN, PLATFORM_PINDUODUO};
+use crate::utils::{app_data_dir, get_platform_from_id, is_douyin_platform, is_pinduoduo_platform, PLATFORM_DOUYIN, PLATFORM_PINDUODUO};
 use crate::commands::webview_utils::{activate_08_webview, get_active_08};
-use crate::webview::creator::{create_douyin_webview, create_platform_webview, get_webview_ids, has_webview, remove_webview_id};
+use crate::webview::creator::{create_douyin_webview, create_pinduoduo_webview, create_platform_webview, get_webview_ids, has_webview, remove_webview_id};
 
 #[derive(Deserialize)]
 pub struct ShopPlatform {
@@ -107,8 +107,26 @@ pub async fn select_shop(window: Window, shop_id: String) {
                     log::error!("[select_shop] 创建抖音 webview 失败: {e}");
                 }
             }
+        } else if is_pinduoduo_platform(&shop_id) {
+            match create_pinduoduo_webview(&window, w, h, Some(&shop_id)) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("[select_shop] 创建拼多多 webview 失败: {e}");
+                }
+            }
         }
     }
+}
+
+pub(crate) fn notify_shop_list_update(webview: &Webview) {
+    match webview.eval("fetchShopList()") {
+        Ok(()) => {
+            log::info!("[shop_name_callback] 获取店铺列表成功");
+        }
+        Err(e) => {
+            log::error!("[shop_name_callback] 获取店铺列表失败: {}", e);
+        }
+    };
 }
 
 // 必须用 async：同步 command 跑在 blocking 线程池，
@@ -123,25 +141,23 @@ pub async fn add_shop(window: Window, platform: ShopPlatform) {
             log::info!("选择抖音小店");
             match crate::webview::douyin_shop::open_douyin_shop(&window) {
                 Ok(_) => {
-                    match window.get_webview("02_app") {
-                        None => {}
-                        Some(webview) => {
-                            match webview.eval("fetchShopList()") {
-                                Ok(()) => {
-                                    log::info!("[shop_name_callback] 获取店铺列表成功");
-                                }
-                                Err(e) => {
-                                    log::error!("[shop_name_callback] 获取店铺列表失败: {}", e);
-                                }
-                            };
-                        }
-                    };
+                    if let Some(wv) = window.get_webview("02_app") {
+                        notify_shop_list_update(&wv);
+                    }
                 }
                 Err(e) => log::error!("[add_shop] {e}"),
             }
         }
         s if s == PLATFORM_PINDUODUO => {
             log::info!("选择拼多多");
+            match crate::webview::douyin_shop::open_pinduoduo_shop(&window) {
+                Ok(_) => {
+                    if let Some(wv) = window.get_webview("02_app") {
+                        notify_shop_list_update(&wv);
+                    }
+                }
+                Err(e) => log::error!("[add_shop] {e}"),
+            }
         }
         _ => {
             log::warn!("未知平台");

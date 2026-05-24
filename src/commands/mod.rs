@@ -7,3 +7,4 @@ pub mod shop_callback;
 pub mod ws_handler;
 pub mod http_response_intercepted;
 pub mod get_link_info;
+pub mod pdd_send;

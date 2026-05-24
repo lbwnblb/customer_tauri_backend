@@ -2,7 +2,7 @@ use log::info;
 use serde::Deserialize;
 use tauri::{command, Webview};
 
-use crate::utils::feige_resp::PIGEON_SIGN_MAP;
+use crate::utils::douyin::feige_resp::PIGEON_SIGN_MAP;
 
 #[derive(Debug, Deserialize)]
 struct LinkInfoResponse {

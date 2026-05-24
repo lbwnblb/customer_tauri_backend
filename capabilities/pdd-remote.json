@@ -1,0 +1,19 @@
+{
+  "identifier": "pdd-remote",
+  "webviews": ["08_pinduoduo_*"],
+  "remote": {
+    "urls": [
+      "https://mms.pinduoduo.com/*",
+      "https://*.pinduoduo.com/*"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "allow-on-request",
+    "allow-on-ws",
+    "allow-pdd-ws-recv",
+    "allow-pdd-ws-send",
+    "allow-shop-name-callback",
+    "allow-pdd-crypto-callback"
+  ]
+}

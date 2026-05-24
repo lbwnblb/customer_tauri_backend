@@ -61,14 +61,14 @@ description = "允许调用 on_ws_binary"
 commands.allow = ["on_ws_binary"]
 
 [[permission]]
-identifier = "allow-on-ws-recv"
-description = "允许调用 on_ws_recv"
-commands.allow = ["on_ws_recv"]
+identifier = "allow-dy-ws-recv"
+description = "允许调用 dy_ws_recv"
+commands.allow = ["dy_ws_recv"]
 
 [[permission]]
-identifier = "allow-on-ws-send"
-description = "允许调用 on_ws_send"
-commands.allow = ["on_ws_send"]
+identifier = "allow-dy-ws-send"
+description = "允许调用 dy_ws_send"
+commands.allow = ["dy_ws_send"]
 
 [[permission]]
 identifier = "allow-on-http-response-intercepted"
@@ -84,4 +84,24 @@ commands.allow = ["shop_name_callback"]
 identifier = "allow-on-get-link-info"
 description = "允许调用 on_get_link_info"
 commands.allow = ["on_get_link_info"]
+
+[[permission]]
+identifier = "allow-pdd-ws-recv"
+description = "允许调用 pdd_ws_recv"
+commands.allow = ["pdd_ws_recv"]
+
+[[permission]]
+identifier = "allow-pdd-ws-send"
+description = "允许调用 pdd_ws_send"
+commands.allow = ["pdd_ws_send"]
+
+[[permission]]
+identifier = "allow-pdd-send-message"
+description = "允许调用 pdd_send_message"
+commands.allow = ["pdd_send_message"]
+
+[[permission]]
+identifier = "allow-pdd-crypto-callback"
+description = "允许 JS webview 回调加密参数"
+commands.allow = ["pdd_crypto_callback"]
 

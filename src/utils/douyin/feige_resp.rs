@@ -4,7 +4,7 @@ use std::sync::{LazyLock, Mutex};
 use log::info;
 use prost::Message;
 use url::Url;
-use crate::utils::protobuf::im_proto;
+use crate::utils::douyin::protobuf::im_proto;
 use crate::utils::HttpClient;
 use serde::{Deserialize, Serialize};
 use tauri::Webview;

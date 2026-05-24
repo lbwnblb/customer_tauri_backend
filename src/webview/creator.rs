@@ -8,7 +8,8 @@ use tauri::{Manager, Url, WebviewUrl, Window};
 use crate::commands::webview_utils::{park_other_08_webviews, set_active_08};
 use crate::config;
 use crate::database;
-use crate::scripts;
+use crate::scripts::douyin::{feige_intercept, link_info_interceptor, redirect, ws_hook};
+use crate::scripts::pinduoduo::{self, crypto_hook};
 use crate::utils;
 
 static WEBVIEW_IDS: LazyLock<Mutex<Vec<String>>> = LazyLock::new(|| Mutex::new(Vec::new()));
@@ -118,11 +119,48 @@ pub fn create_douyin_webview(
             WebviewUrl::External(
                 Url::parse(config::FEIGE_KEFU_URL).expect("invalid feige kefu url"),
             ),
-        ).initialization_script(&scripts::redirect::douyin_redirect(&id))
-        .initialization_script(&scripts::feige_intercept::create_intercepted_webview())
-            .initialization_script(&scripts::ws_hook::create_ws_hook())
+        ).initialization_script(&redirect::douyin_redirect(&id))
+        .initialization_script(&feige_intercept::create_intercepted_webview())
+            .initialization_script(&ws_hook::create_ws_hook())
             // .initialization_script(&scripts::http_interceptor::create_http_response_hook())
-            .initialization_script(&scripts::link_info_interceptor::create_link_info_hook())
+            .initialization_script(&link_info_interceptor::create_link_info_hook())
+        .data_directory(data_dir),
+        tauri::LogicalPosition::new(w * 0.2, 0.0),
+        tauri::LogicalSize::new(w * 0.8, h),
+    )?;
+    WEBVIEW_IDS.lock().unwrap().push(id.clone());
+
+    set_active_08(Some(id.clone()));
+
+    Ok(id)
+}
+pub fn create_pinduoduo_webview(
+    window: &Window,
+    w: f64,
+    h: f64,
+    id: Option<&str>,
+) -> Result<String, tauri::Error> {
+    let id = id
+        .map(String::from)
+        .unwrap_or_else(|| format!("08_pinduoduo_{}", utils::uuid_no_hyphen()));
+
+    let data_dir = PathBuf::from(utils::app_data_dir()).join(&id);
+    fs::create_dir_all(&data_dir)?;
+
+    // 先把所有现有 08 webview 停车,让出激活位
+    park_other_08_webviews(window, &id);
+
+    window.add_child(
+        WebviewBuilder::new(
+            &id,
+            WebviewUrl::External(
+                Url::parse(config::PDD_KEFU_LOGIN).expect("invalid pdd kefu url"),
+            ),
+        )
+        .initialization_script(&pinduoduo::home::pdd_redirect())
+        .initialization_script(&pinduoduo::pinduoduo_intercept::create_intercepted_webview_pdd())
+        .initialization_script(&pinduoduo::ws_hook::create_pdd_ws_hook())
+        .initialization_script(&crypto_hook::create_pdd_crypto_hook())
         .data_directory(data_dir),
         tauri::LogicalPosition::new(w * 0.2, 0.0),
         tauri::LogicalSize::new(w * 0.8, h),

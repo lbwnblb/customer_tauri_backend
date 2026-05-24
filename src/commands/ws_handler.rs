@@ -1,8 +1,8 @@
 use log::info;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use crate::utils::protobuf::{feige_im_recv, feige_im_send};
-use crate::utils::feige_resp::{IM_TOKEN_MAP, IM_DEVICE_ID_MAP};
+use serde::Deserialize;
+use crate::utils::douyin::protobuf::{feige_im_recv, feige_im_send};
+use crate::utils::douyin::feige_resp::{IM_TOKEN_MAP, IM_DEVICE_ID_MAP};
+use crate::utils::pinduoduo::titan::{decode_titan_frame, decode_titan_upstream_frame};
 use tauri::{Webview, ipc::{InvokeBody, Request}};
 
 /// 前端统一发过来的结构，event 区分类型，其余字段按需取
@@ -36,7 +36,7 @@ fn extract_raw_body(request: &Request) -> Option<Vec<u8>> {
 }
 
 #[tauri::command]
-pub fn on_ws_recv(webview: Webview, request: Request) {
+pub fn dy_ws_recv(webview: Webview, request: Request) {
     let Some(bytes) = extract_raw_body(&request) else { return };
     tauri::async_runtime::spawn(async move {
         feige_im_recv(&webview, &bytes).await;
@@ -44,7 +44,7 @@ pub fn on_ws_recv(webview: Webview, request: Request) {
 }
 
 #[tauri::command]
-pub fn on_ws_send(webview: Webview, request: Request) {
+pub fn dy_ws_send(webview: Webview, request: Request) {
     let Some(bytes) = extract_raw_body(&request) else { return };
     tauri::async_runtime::spawn(async move {
         feige_im_send(&webview, &bytes).await;
@@ -55,35 +55,36 @@ pub fn on_ws_send(webview: Webview, request: Request) {
 pub fn on_ws(webview: Webview, event: WsEvent) {
     match event.event.as_str() {
         "connect" => {
-            info!("[WS] 连接建立: {}", event.url.as_deref().unwrap_or(""));
-            // 存储 token 和 device_id，供 get_by_conversation 使用
+            info!("[WS][DY] 连接建立: {}", event.url.as_deref().unwrap_or(""));
             if let Some(token) = &event.token {
                 if !token.is_empty() {
                     IM_TOKEN_MAP.lock().unwrap().insert(webview.label().to_string(), token.clone());
-                    info!("[WS] 已存储 IM token for webview={}", webview.label());
+                    info!("[WS][DY] 已存储 IM token for webview={}", webview.label());
                 }
             }
             if let Some(device_id) = &event.device_id {
                 if !device_id.is_empty() {
                     IM_DEVICE_ID_MAP.lock().unwrap().insert(webview.label().to_string(), device_id.clone());
-                    info!("[WS] 已存储 device_id={} for webview={}", device_id, webview.label());
+                    info!("[WS][DY] 已存储 device_id={} for webview={}", device_id, webview.label());
                 }
             }
         }
-        "open" => {
-            info!("[WS] 连接已打开");
-        }
-        "close" => {
-            info!("[WS] 连接关闭: code={:?} reason={:?}", event.code, event.reason);
-        }
-        "error" => {
-            info!("[WS] 连接错误");
-        }
-        "message" => {
-            info!("[WS] 收到消息: {}", event.payload.as_deref().unwrap_or(""));
-        }
-        other => {
-            info!("[WS] 未知事件: {}", other);
-        }
+        "open" => info!("[WS][DY] 连接已打开"),
+        "close" => info!("[WS][DY] 连接关闭: code={:?} reason={:?}", event.code, event.reason),
+        "error" => info!("[WS][DY] 连接错误"),
+        "message" => info!("[WS][DY] 收到消息: {}", event.payload.as_deref().unwrap_or("")),
+        other => info!("[WS][DY] 未知事件: {}", other),
     }
+}
+
+#[tauri::command]
+pub fn pdd_ws_recv(webview: Webview, data: Vec<u8>) {
+    info!("[WS][PDD] 收到二进制消息, webview={}, len={}", webview.label(), data.len());
+    decode_titan_frame(&data);
+}
+
+#[tauri::command]
+pub fn pdd_ws_send(webview: Webview, data: Vec<u8>) {
+    info!("[WS][PDD] 发送二进制消息, webview={}, len={}", webview.label(), data.len());
+    decode_titan_upstream_frame(&data);
 }

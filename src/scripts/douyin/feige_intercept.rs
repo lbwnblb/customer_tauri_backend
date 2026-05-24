@@ -4,9 +4,13 @@ pub fn create_intercepted_webview() -> String {
     if (window.__feige_intercept_installed) return;
     window.__feige_intercept_installed = true;
 
-    let _busy = false;
+    let _lastInvokeAt = 0;
+    const _cooldownMs = 60000;
 
     const safeInvoke = (payload) => {
+        const now = Date.now();
+        if (now - _lastInvokeAt < _cooldownMs) return;
+        _lastInvokeAt = now;
         try {
             if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
                 window.__TAURI__.core.invoke('on_request', { payload })
@@ -71,23 +75,19 @@ pub fn create_intercepted_webview() -> String {
         if (typeof _origFetch === 'function') {
             window.fetch = new Proxy(_origFetch, {
                 apply(target, thisArg, argsList) {
-                    if (!_busy) {
-                        _busy = true;
-                        try {
-                            const [input, init] = argsList;
-                            const url = (input instanceof Request) ? input.url : String(input || '');
-                            const method = (init && init.method) ||
-                                           ((input instanceof Request) ? input.method : 'GET');
-                            const body = (init && init.body) || null;
-                            const headers = (init && init.headers)
-                                ? extractHeaders(init.headers)
-                                : (input instanceof Request)
-                                    ? extractHeaders(input.headers)
-                                    : null;
-                            log('fetch', String(method).toUpperCase(), url, body, headers);
-                        } catch (_) {}
-                        _busy = false;
-                    }
+                    try {
+                        const [input, init] = argsList;
+                        const url = (input instanceof Request) ? input.url : String(input || '');
+                        const method = (init && init.method) ||
+                                       ((input instanceof Request) ? input.method : 'GET');
+                        const body = (init && init.body) || null;
+                        const headers = (init && init.headers)
+                            ? extractHeaders(init.headers)
+                            : (input instanceof Request)
+                                ? extractHeaders(input.headers)
+                                : null;
+                        log('fetch', String(method).toUpperCase(), url, body, headers);
+                    } catch (_) {}
                     return Reflect.apply(target, thisArg, argsList);
                 }
             });
@@ -123,16 +123,12 @@ pub fn create_intercepted_webview() -> String {
 
         proto.send = new Proxy(_origSend, {
             apply(target, thisArg, argsList) {
-                if (!_busy) {
-                    _busy = true;
-                    try {
-                        const meta = xhrMap.get(thisArg);
-                        if (meta) {
-                            log('xhr', String(meta.m || 'GET').toUpperCase(), meta.u || '', argsList[0], meta.h || null);
-                        }
-                    } catch (_) {}
-                    _busy = false;
-                }
+                try {
+                    const meta = xhrMap.get(thisArg);
+                    if (meta) {
+                        log('xhr', String(meta.m || 'GET').toUpperCase(), meta.u || '', argsList[0], meta.h || null);
+                    }
+                } catch (_) {}
                 return Reflect.apply(target, thisArg, argsList);
             }
         });
@@ -144,11 +140,7 @@ pub fn create_intercepted_webview() -> String {
             const _origBeacon = navigator.sendBeacon;
             navigator.sendBeacon = new Proxy(_origBeacon, {
                 apply(target, thisArg, argsList) {
-                    if (!_busy) {
-                        _busy = true;
-                        try { log('beacon', 'POST', argsList[0], argsList[1], null); } catch (_) {}
-                        _busy = false;
-                    }
+                    try { log('beacon', 'POST', argsList[0], argsList[1], null); } catch (_) {}
                     return Reflect.apply(target, thisArg, argsList);
                 }
             });

@@ -1,0 +1,321 @@
+syntax = "proto3";
+
+package titan;
+
+// ============================================================
+// PDD Titan WebSocket 协议
+// 从 chat-merchant index.bundle.js 逆向提取
+// ============================================================
+//
+// ■ 二进制帧格式 (16字节头 + payload)
+// ┌──────────┬──────────┬──────────┬──────────┬──────────┬────────────┐
+// │ magic    │ cmd      │ ctx      │ reserve  │ bodyLen  │ payload    │
+// │ Int16 BE │ Int16 BE │ Int32 BE │ Int32 BE │ Int32 BE │ N bytes   │
+// │ 2 bytes  │ 2 bytes  │ 4 bytes  │ 4 bytes  │ 4 bytes  │ bodyLen   │
+// └──────────┴──────────┴──────────┴──────────┴──────────┴────────────┘
+//
+// payload = Protobuf 编码的 TitanDownstream(下行) 或 TitanUpstream(上行)
+//
+// ■ 解包流程
+//   1. 读取 16 字节头
+//   2. protobuf.decode(payload) → TitanDownstream
+//   3. 如果 compress == 1, 对 body 和 extension 做 gzip 解压
+//   4. 根据 command 选择业务 Message 解码 body:
+//      "titan.notifyDataLite" → NotifyDataLite
+//      "titan.notify"         → Notify
+//      "titan.notifyData"     → NotifyData
+//      "titan.notify.inner"   → NotifyInner
+//      "titan.ping"           → 无 body, 回复 titan.pong
+//      "titan.session"        → TitanSessionRequest
+//
+// ■ 常量
+//   cmd = 102     → 系统消息
+//   compress = 1  → gzip
+//   protocol = 1  → 标准协议版本
+
+
+// ======================== Base 传输层 ========================
+
+message AppInfo {
+    string              titanid        = 1;
+    string              ua             = 3;
+    uint32              os             = 4;
+    string              uid            = 5;
+    bool                repackage      = 11;
+    string              accesstoken    = 12;
+    map<string, bytes>  customPayload  = 13;
+    uint32              authType       = 17;
+    uint32              sceneType      = 19;
+}
+
+message ExtensionMap {
+    map<string, bytes> info = 1;
+}
+
+message MulticastGroupKeyInfo {
+    uint32 appId   = 1;
+    uint32 bizType = 2;
+    string groupId = 3;
+}
+
+message ReconnectInfo {
+    uint32 version     = 1;
+    uint32 delaySecond = 2;
+}
+
+message TitanDownstream {
+    string command       = 1;
+    uint32 protocol      = 2;
+    uint32 errorCode     = 3;
+    uint32 bizCode       = 4;
+    string bizErrorMsg   = 5;
+    uint32 compress      = 6;   // 1 = gzip
+    bytes  extension     = 9;
+    bytes  body          = 10;
+    uint64 downstreamSeq = 11;
+    uint64 conId         = 12;
+    uint64 ctxId         = 13;
+}
+
+message TitanUpstream {
+    uint32                appId                = 1;
+    string                command              = 2;
+    uint32                protocol             = 3;
+    uint32                compress             = 4;
+    string                host                 = 6;
+    bytes                 appinfo              = 7;
+    bytes                 sessionResumptionReq = 8;
+    bytes                 body                 = 9;
+    uint64                upstreamSeq          = 11;
+    uint64                conId                = 12;
+    uint64                ctxId                = 13;
+    MulticastGroupKeyInfo keyInfo              = 14;
+}
+
+message TitanSessionRequest {
+    bytes  encryptedAppInfo = 7;
+    uint32 requestType      = 10;
+    uint32 protocolVersion  = 11;
+    bool   isPushConn       = 12;
+}
+
+message UpdateAppInfoRequest {
+    bytes appInfo = 1;
+}
+
+
+// ======================== Multicast 组播 ========================
+
+message MulticastGroupItem {
+    uint32 bizType = 1;
+    string groupId = 2;
+}
+
+message MulticastBindGroupReq {
+    repeated MulticastGroupItem groupList = 1;
+}
+
+message MulticastUnBindGroupReq {
+    repeated MulticastGroupItem groupList = 1;
+}
+
+message MulticastSyncReqItem {
+    uint32 bizType = 1;
+    string groupId = 2;
+    uint64 offset  = 3;
+}
+
+message MulticastSyncReq {
+    repeated MulticastSyncReqItem syncList = 1;
+}
+
+message MulticastHttpSyncReq {
+    uint32           appId = 1;
+    MulticastSyncReq req   = 2;
+}
+
+message MulticastLite {
+    uint32 bizType = 1;
+    string groupId = 2;
+    string msgId   = 3;
+    bytes  payload = 4;
+    bool   needAck = 5;
+}
+
+message MulticastLiteAck {
+    uint32 bizType = 1;
+    string groupId = 2;
+    string msgId   = 3;
+    uint32 errCode = 4;
+}
+
+message MulticastNotify {
+    uint32 bizType     = 1;
+    string groupId     = 2;
+    uint64 offset      = 3;
+    uint64 ts          = 4;
+    uint32 minInterval = 5;
+    uint32 maxInterval = 6;
+    bytes  payload     = 7;
+    bool   needAck     = 8;
+}
+
+message MulticastSyncAckItem {
+    uint32 bizType = 1;
+    string groupId = 2;
+    uint64 offset  = 3;
+    uint64 ts      = 4;
+    uint32 errCode = 5;
+}
+
+message MulticastNotifyAck {
+    MulticastSyncAckItem ackInfo = 1;
+}
+
+message MulticastSyncAck {
+    repeated MulticastSyncAckItem ackList = 1;
+}
+
+message MulticastSyncRespMsg {
+    uint64 offset  = 1;
+    bytes  payload = 2;
+    uint64 ts      = 3;
+}
+
+message MulticastSyncRespItem {
+    uint32                        bizType     = 1;
+    string                        groupId     = 2;
+    bool                          forceUpdate = 3;
+    repeated MulticastSyncRespMsg payList     = 4;
+}
+
+message MulticastSyncResp {
+    repeated MulticastSyncRespItem resList     = 1;
+    uint32                         minInterval = 2;
+    uint32                         maxInterval = 3;
+    bool                           needAck     = 4;
+}
+
+
+// ======================== Unicast 单播 ========================
+
+message AckItemDetailInfo {
+    uint32 bizType   = 1;
+    uint32 subType   = 2;
+    string msgId     = 3;
+    uint64 timestamp = 4;
+}
+
+message AckGroupItem {
+    uint64                             clientOffset = 1;
+    map<uint64, uint32>                msgMap       = 2;
+    map<uint64, AckItemDetailInfo>     msgDetailMap = 3;
+}
+
+message Ack {
+    map<uint32, AckGroupItem> uidMap        = 1;
+    map<uint32, AckGroupItem> titanidMap    = 2;
+    map<string, string>       additionalMap = 3;
+}
+
+message Notify {
+    string          uid              = 1;
+    string          titanid          = 2;
+    uint32          os               = 3;
+    repeated uint32 uidGroupList     = 4 [packed = true];
+    repeated uint32 titanidGroupList = 5 [packed = true];
+}
+
+message NotifyMsg {
+    uint32 bizType     = 1;
+    bool   isExpired   = 2;
+    uint64 offset      = 3;
+    uint64 startOffset = 4;
+    uint64 endOffset   = 5;
+    bytes  payload     = 6;
+    string msgId       = 7;
+    uint32 subType     = 8;
+    uint64 timestamp   = 9;
+    uint64 expiredTs   = 10;
+}
+
+message NotifyGroupMsgList {
+    repeated NotifyMsg msgList = 1;
+}
+
+message NotifyData {
+    string                          uid           = 1;
+    string                          titanid       = 2;
+    uint32                          os            = 3;
+    map<uint32, NotifyGroupMsgList> uidMap        = 4;
+    map<uint32, NotifyGroupMsgList> titanidMap    = 5;
+    map<string, string>             additionalMap = 6;
+}
+
+// 你截获的消息 body 解压后就是这个类型
+message NotifyDataLite {
+    string              uid           = 1;
+    string              titanid       = 2;
+    uint32              os            = 3;
+    uint32              bizType       = 4;
+    string              msgId         = 5;
+    bytes               payload       = 6;
+    map<string, string> additionalMap = 7;
+    uint32              subType       = 8;
+    uint64              timestamp     = 9;
+}
+
+message NotifyDataLiteAck {
+    string              msgId         = 1;
+    uint32              bizType       = 2;
+    map<string, string> additionalMap = 3;
+    uint32              subType       = 4;
+    uint64              timestamp     = 5;
+}
+
+message NotifyInner {
+    uint32 bizType = 1;
+    bytes  body    = 2;
+}
+
+message Sync {
+    map<uint32, uint64> uidOffsetMap     = 1;
+    map<uint32, uint64> titanidOffsetMap = 2;
+    bool                syncAll          = 3;
+    uint32              accept           = 4;
+}
+
+message SyncMsg {
+    uint32 bizType     = 1;
+    bool   isExpired   = 2;
+    uint64 offset      = 3;
+    uint64 startOffset = 4;
+    uint64 endOffset   = 5;
+    bytes  payload     = 6;
+    string msgId       = 7;
+    uint32 subType     = 8;
+    uint64 timestamp   = 9;
+    uint64 expiredTs   = 10;
+}
+
+message SyncGroupMsgList {
+    repeated SyncMsg msgList    = 1;
+    bool             forceUpdate = 2;
+    uint32           hasMore     = 3;
+}
+
+message SyncResponse {
+    string                         uid           = 1;
+    string                         titanid       = 2;
+    uint32                         os            = 3;
+    map<uint32, SyncGroupMsgList>  uidMap        = 4;
+    map<uint32, SyncGroupMsgList>  titanidMap    = 5;
+    map<string, string>            additionalMap = 6;
+    bool                           needAck       = 7;
+    uint32                         interval      = 8;
+}
+
+message TokenFail {
+    uint32 errCode     = 1;
+    bytes  accesstoken = 2;
+}

@@ -1,8 +1,8 @@
 use log::{error, info};
 use prost::DecodeError;
 use tauri::command;
-use crate::utils::protobuf::im_proto::Response;
-use crate::utils::protobuf::parse_response;
+use crate::utils::douyin::protobuf::im_proto::Response;
+use crate::utils::douyin::protobuf::parse_response;
 
 /// Tauri command，接收二进制响应数据
 ///

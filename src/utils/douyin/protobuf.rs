@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::sync::atomic::Ordering;
 use log::{info, warn};
 use prost::{DecodeError, Message};
 use tauri::Webview;
 use crate::utils::{app_data, get_by_conversation};
-use crate::utils::doudian_utils::{build_send_frame, build_send_payload, SEQUENCE_ID};
-use crate::utils::protobuf::im_proto::{GetConversationInfoListV2ResponseBody, MessageBody, NewMessageNotify, Request, Response, ResponseBody};
+use crate::utils::douyin::doudian_utils::{build_get_conversation_info_list_v2_frame, build_get_conversation_info_list_v2_payload, build_send_frame, build_send_payload, SEQUENCE_ID, TICKET_NOTIFY_MAP};
+use crate::utils::douyin::protobuf::im_proto::{GetConversationInfoListV2ResponseBody, MessageBody, NewMessageNotify, Request, Response, ResponseBody};
 
 pub mod im_proto {
     include!(concat!(env!("OUT_DIR"), "/dy_im_proto.rs"));
@@ -17,8 +17,8 @@ pub mod im_proto {
 pub static SEND_REQUEST_MAP: LazyLock<Mutex<HashMap<String, im_proto::Request>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub static TICKET_MAP: LazyLock<Mutex<String>> =
-    LazyLock::new(|| Mutex::new(String::new()));
+pub static TICKET_MAP: LazyLock<Mutex<HashMap<i64, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 
 pub mod cmd_status {
@@ -150,7 +150,7 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                                                                                         let conversation_short_id = message.conversation_short_id.clone();
                                                                                                         // message.
                                                                                                         //准备回复消息
-                                                                                                        let send_payload = match build_send_payload(webview, conversation_short_id,format!("我在:{}",SEQUENCE_ID.load(Ordering::Relaxed)), message.sub_conversation_short_id, message.security_conversation_id.clone()) {
+                                                                                                        let send_payload = match build_send_payload(webview, conversation_short_id, message.conversation_type, format!("我在:{}",SEQUENCE_ID.load(Ordering::Relaxed)), message.sub_conversation_short_id, message.security_conversation_id.clone()).await {
                                                                                                             Ok(payload) => payload,
                                                                                                             Err(e) => {
                                                                                                                 log::error!("build_send_payload failed: {}", e);
@@ -211,6 +211,7 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                     }
                                 }
                                 cmd_status::GET_CONVERSATION_INFO_LIST_V2_BODY=>{
+                                    // info!("[IM] [RECV] GET_CONVERSATION_INFO_LIST_V2_BODY:{:?}",response.body);
                                     match response.body {
                                         None => {}
                                         Some(body) => {
@@ -224,7 +225,10 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                                             Some(conversation_short_id) => {
                                                                 let conversation_short_id_str = conversation_short_id.to_string();
                                                                 if let Some(ref ticket) = conversationinfov2.ticket {
-                                                                    *TICKET_MAP.lock().unwrap() = ticket.clone();
+                                                                    TICKET_MAP.lock().unwrap().insert(conversation_short_id, ticket.clone());
+                                                                    if let Some(notify) = TICKET_NOTIFY_MAP.lock().unwrap().get(&conversation_short_id) {
+                                                                        notify.notify_one();
+                                                                    }
                                                                 }
                                                                 let dir = app_data::response_cmd_610_get_conversation_info_list_v2_body();
                                                                 let _ = fs::create_dir_all(&dir);
@@ -388,8 +392,8 @@ pub async fn feige_im_send(webview: &Webview, bytes: &[u8]) {
                         Some(cmd) => {
                             match cmd {
                                 cmd_status::GET_CONVERSATION_INFO_LIST_V2_BODY => {
-                                    // info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY seqid={} logid={} service={} method={} headers={:?} payload_encoding={:?} payload_type={:?}", frame.seqid, frame.logid, frame.service, frame.method, frame.headers, frame.payload_encoding, frame.payload_type);
-                                    // info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY request={:?}", request);
+                                    info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY seqid={} logid={} service={} method={} headers={:?} payload_encoding={:?} payload_type={:?}", frame.seqid, frame.logid, frame.service, frame.method, frame.headers, frame.payload_encoding, frame.payload_type);
+                                    info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY request={:?}", request);
                                 }
                                 _=> {}
                             }

@@ -39,14 +39,14 @@ pub fn create_ws_hook() -> String {
 
     ws.addEventListener('message', async (e) => {
       const buf = await toArrayBuffer(e.data);
-      invoke('on_ws_recv', buf);
+      invoke('dy_ws_recv', buf);
     });
 
     const origSend = ws.send.bind(ws);
     ws.send = async function (data) {
       try {
         const buf = await toArrayBuffer(data);
-        invoke('on_ws_send', buf);
+        invoke('dy_ws_send', buf);
       } catch (_) {}
       origSend(data);
     };

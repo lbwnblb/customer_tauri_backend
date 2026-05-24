@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use log::info;
 use tauri::Webview;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::utils::feige_resp::{FeigeShopInfoParams, SHOP_INFO_PARAMS, REQUEST_HEADERS};
+use crate::utils::douyin::feige_resp::{FeigeShopInfoParams, SHOP_INFO_PARAMS, REQUEST_HEADERS};
+use crate::utils::is_douyin_platform;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MonitorRequest {
@@ -19,10 +19,12 @@ pub struct MonitorRequest {
 pub fn on_request(webview: Webview, payload: MonitorRequest) {
     let label = webview.label().to_string();
 
-    if let Some(serde_json::Value::Object(ref query)) = payload.query {
-        let mut map = SHOP_INFO_PARAMS.lock().unwrap();
-        let params = map.entry(label.clone()).or_default();
-        params.update_from_query(query);
+    if is_douyin_platform(&label) {
+        if let Some(Value::Object(ref query)) = payload.query {
+            let mut map = SHOP_INFO_PARAMS.lock().unwrap();
+            let params = map.entry(label.clone()).or_default();
+            params.update_from_query(query);
+        }
     }
 
     if let Some(headers) = payload.headers {

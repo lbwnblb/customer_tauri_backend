@@ -1,5 +1,5 @@
 use tauri::{Manager, WindowBuilder};
-use crate::webview::creator::{create_app_webview, create_bg_webview};
+use crate::webview::creator::{create_app_webview, create_bg_webview, create_platform_webview};
 
 mod commands;
 mod config;
@@ -14,7 +14,7 @@ pub fn run() {
     utils::init_logger();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![commands::greet::greet, commands::on_request::on_request, commands::shop::shop_account, commands::shop::add_shop, commands::shop::delete_shop, commands::shop::shop_list, commands::shop::select_shop, commands::platform::select_platform,  commands::shop_callback::shop_name_callback, commands::ws_handler::on_ws, commands::ws_handler::on_ws_recv, commands::ws_handler::on_ws_send, commands::http_response_intercepted::on_http_response_intercepted, commands::get_link_info::on_get_link_info])
+        .invoke_handler(tauri::generate_handler![commands::greet::greet, commands::on_request::on_request, commands::shop::shop_account, commands::shop::add_shop, commands::shop::delete_shop, commands::shop::shop_list, commands::shop::select_shop, commands::platform::select_platform,  commands::shop_callback::shop_name_callback, commands::ws_handler::on_ws, commands::ws_handler::dy_ws_recv, commands::ws_handler::dy_ws_send, commands::ws_handler::pdd_ws_recv, commands::ws_handler::pdd_ws_send, commands::http_response_intercepted::on_http_response_intercepted, commands::get_link_info::on_get_link_info, commands::pdd_send::pdd_send_message, commands::pdd_send::pdd_crypto_callback])
         .setup(|app| {
             let monitor = app.primary_monitor()?.expect("找不到主显示器");
             let screen_size = monitor.size();
@@ -35,7 +35,7 @@ pub fn run() {
             create_app_webview(&window, w, h)?;
 
 
-            create_bg_webview(&window, w, h)?;
+            create_platform_webview(&window, w, h)?;
 
             window::on_window_resized(&window);
             Ok(())

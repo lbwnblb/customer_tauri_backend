@@ -714,6 +714,7 @@ dependencies = [
  "bytes",
  "chrono",
  "env_logger",
+ "flate2",
  "hex",
  "log",
  "prost",
