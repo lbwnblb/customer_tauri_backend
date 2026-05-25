@@ -7,10 +7,10 @@ use tauri::{Manager, Url, WebviewUrl, Window};
 
 use crate::commands::webview_utils::{park_other_08_webviews, set_active_08};
 use crate::config;
-use crate::database;
 use crate::scripts::douyin::{feige_intercept, link_info_interceptor, redirect, ws_hook};
 use crate::scripts::pinduoduo::{self, crypto_hook};
 use crate::utils;
+use crate::utils::app_data::app_data_dir_home_index;
 
 static WEBVIEW_IDS: LazyLock<Mutex<Vec<String>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
@@ -28,10 +28,23 @@ pub fn remove_webview_id(id: &str) {
     ids.retain(|x| x != id);
 }
 
+pub fn create_auth_webview(window: &Window, w: f64, h: f64) -> Result<(), tauri::Error> {
+    let id = "00_auth".to_string();
+    window.add_child(
+        WebviewBuilder::new(&id, WebviewUrl::App("auth.html".into()))
+            .data_directory(app_data_dir_home_index()),
+        tauri::LogicalPosition::new(0.0, 0.0),
+        tauri::LogicalSize::new(w, h),
+    )?;
+    WEBVIEW_IDS.lock().unwrap().push(id);
+    Ok(())
+}
+
 pub fn create_app_webview(window: &Window, w: f64, h: f64) -> Result<(), tauri::Error> {
     let id = "02_app".to_string();
     window.add_child(
-        WebviewBuilder::new(&id, WebviewUrl::App("index.html".into())),
+        WebviewBuilder::new(&id, WebviewUrl::App("index.html".into()))
+            .data_directory(app_data_dir_home_index()),
         tauri::LogicalPosition::new(0.0, 0.0),
         tauri::LogicalSize::new(w * 0.2, h),
     )?;
@@ -57,7 +70,9 @@ pub fn create_platform_webview(window: &Window, w: f64, h: f64) -> Result<(), ta
     park_other_08_webviews(window, &id);
 
     window.add_child(
-        WebviewBuilder::new(&id, WebviewUrl::App("platform.html".into())).devtools(true),
+        WebviewBuilder::new(&id, WebviewUrl::App("platform.html".into()))
+            .devtools(true)
+            .data_directory(app_data_dir_home_index()),
         tauri::LogicalPosition::new(w * 0.2, 0.0),
         tauri::LogicalSize::new(w * 0.8, h),
     )?;
@@ -76,22 +91,6 @@ pub fn create_platform_webview(window: &Window, w: f64, h: f64) -> Result<(), ta
 
 /// 创建背景 webview(应用启动时的默认底图)。
 /// 创建后即设为 active,使其覆盖整个右侧区域。
-pub fn create_bg_webview(window: &Window, w: f64, h: f64) -> Result<(), tauri::Error> {
-    let id = "08bg".to_string();
-
-    park_other_08_webviews(window, &id);
-
-    window.add_child(
-        WebviewBuilder::new(&id, WebviewUrl::App("bg.html".into())),
-        tauri::LogicalPosition::new(w * 0.2, 0.0),
-        tauri::LogicalSize::new(w * 0.8, h),
-    )?;
-    WEBVIEW_IDS.lock().unwrap().push(id.clone());
-
-    set_active_08(Some(id));
-
-    Ok(())
-}
 
 /// 创建抖音店铺 webview。
 /// 新 webview 直接占据激活位,旧的 active 停到角落。

@@ -28,6 +28,8 @@
     "allow-on-get-link-info",
     "allow-pdd-ws-recv",
     "allow-pdd-ws-send",
-    "allow-pdd-send-message"
+    "allow-pdd-send-message",
+    "allow-on-login-success",
+    "allow-on-logout"
   ]
 }

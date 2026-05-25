@@ -122,6 +122,7 @@ pub async fn send_message(
     uid: &str,
     content: &str,
     anti_content: &str,
+    anti_content_outer: &str,
     hash: &str,
     random: &str,
     request_id: i64,
@@ -170,7 +171,7 @@ pub async fn send_message(
             "random": random
         },
         "client": "WEB",
-        "anti_content": anti_content
+        "anti_content": anti_content_outer
     });
 
     let client = HttpClient::new();
@@ -180,7 +181,7 @@ pub async fn send_message(
         ("cache-control", "no-cache".to_string()),
         ("content-type", "application/json".to_string()),
         ("priority", get("priority", "u=1, i")),
-        ("referer", "https://mms.pinduoduo.com/chat-merchant/index.html".to_string()),
+        ("referer", "https://mms.pinduoduo.com/chat-merchant/index.htm".to_string()),
         ("sec-ch-ua", get("sec-ch-ua", "")),
         ("sec-ch-ua-mobile", get("sec-ch-ua-mobile", "?0")),
         ("sec-ch-ua-platform", get("sec-ch-ua-platform", "\"Windows\"")),
@@ -196,6 +197,8 @@ pub async fn send_message(
         .map(|(k, v)| (*k, v.as_str()))
         .collect();
 
+    log::info!("[PDD][send_message] request body: {}", body);
+
     let resp = client
         .request(
             Method::POST,
@@ -205,7 +208,9 @@ pub async fn send_message(
         )
         .await?;
 
-    resp.json()
+    let result: SendMessageResp = resp.json()?;
+    log::info!("[PDD][send_message] response: {:?}", result);
+    Ok(result)
 }
 
 pub async fn query_final_credential_new(webview: &Webview) -> Result<QueryFinalCredentialResp, HttpError> {

@@ -29,7 +29,11 @@ pub fn on_window_resized(window: &Window) {
                     continue;
                 };
 
-                if id.starts_with("02") {
+                if id.starts_with("00") {
+                    // 登录页,全窗口
+                    let _ = webview.set_position(tauri::LogicalPosition::new(0.0, 0.0));
+                    let _ = webview.set_size(tauri::LogicalSize::new(w, h));
+                } else if id.starts_with("02") {
                     // 左侧导航,固定 20% 宽
                     let _ = webview.set_position(tauri::LogicalPosition::new(0.0, 0.0));
                     let _ = webview.set_size(tauri::LogicalSize::new(w * 0.2, h));

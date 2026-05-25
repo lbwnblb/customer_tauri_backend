@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use serde::Serialize;
-use tauri::{Manager, Window};
+use tauri::{Manager, Webview, Window};
 use tokio::sync::oneshot;
 
 use crate::utils::pinduoduo::pinduoduo_resp::send_message;
 
 struct PddCryptoParams {
     anti_content: String,
+    anti_content_outer: String,
     hash: String,
     random: String,
     request_id: i64,
@@ -22,13 +23,14 @@ static PDD_CRYPTO_CALLBACKS: LazyLock<Mutex<HashMap<String, oneshot::Sender<PddC
 pub async fn pdd_crypto_callback(
     callback_id: String,
     anti_content: String,
+    anti_content_outer: String,
     hash: String,
     random: String,
     request_id: i64,
 ) {
     let sender = PDD_CRYPTO_CALLBACKS.lock().unwrap().remove(&callback_id);
     if let Some(tx) = sender {
-        let _ = tx.send(PddCryptoParams { anti_content, hash, random, request_id });
+        let _ = tx.send(PddCryptoParams { anti_content, anti_content_outer, hash, random, request_id });
     }
 }
 
@@ -37,6 +39,44 @@ pub async fn pdd_crypto_callback(
 pub struct PddSendResult {
     pub success: bool,
     pub error_msg: Option<String>,
+}
+
+/// 内部调用：通过 webview 内 JS 计算加密参数后发送消息（供自动回复等场景使用）。
+pub async fn send_pdd_auto_reply(webview: &Webview, uid: &str, content: &str) -> Result<(), String> {
+    let callback_id = crate::utils::uuid_no_hyphen();
+    let (tx, rx) = oneshot::channel::<PddCryptoParams>();
+
+    PDD_CRYPTO_CALLBACKS
+        .lock()
+        .unwrap()
+        .insert(callback_id.clone(), tx);
+
+    let js = format!(
+        r#"(function(){{var u={uid},c={content},id={cb},n=0;function t(){{if(window.__pddComputeCrypto){{window.__pddComputeCrypto(u,c,id);}}else if(++n<45){{setTimeout(t,200);}}else{{console.error('[pdd] crypto hook 未就绪，已等待 9s');}}}}t();}})();"#,
+        uid     = serde_json::to_string(uid).unwrap(),
+        content = serde_json::to_string(content).unwrap(),
+        cb      = serde_json::to_string(&callback_id).unwrap(),
+    );
+    webview.eval(&js).map_err(|e| e.to_string())?;
+
+    let params = tokio::time::timeout(std::time::Duration::from_secs(10), rx)
+        .await
+        .map_err(|_| "等待加密参数超时".to_string())?
+        .map_err(|_| "crypto channel 已关闭".to_string())?;
+
+    send_message(
+        webview,
+        uid,
+        content,
+        &params.anti_content,
+        &params.anti_content_outer,
+        &params.hash,
+        &params.random,
+        params.request_id,
+    )
+    .await
+    .map(|_| ())
+    .map_err(|e| e.to_string())
 }
 
 /// 前端调用此命令发送拼多多客服消息。
@@ -62,7 +102,7 @@ pub async fn pdd_send_message(
         .insert(callback_id.clone(), tx);
 
     let js = format!(
-        "if (window.__pddComputeCrypto) {{ window.__pddComputeCrypto({uid}, {content}, {cb}); }} else {{ console.error('[pdd] crypto hook 未就绪'); }}",
+        r#"(function(){{var u={uid},c={content},id={cb},n=0;function t(){{if(window.__pddComputeCrypto){{window.__pddComputeCrypto(u,c,id);}}else if(++n<45){{setTimeout(t,200);}}else{{console.error('[pdd] crypto hook 未就绪，已等待 9s');}}}}t();}})();"#,
         uid     = serde_json::to_string(&uid).unwrap(),
         content = serde_json::to_string(&content).unwrap(),
         cb      = serde_json::to_string(&callback_id).unwrap(),
@@ -87,6 +127,7 @@ pub async fn pdd_send_message(
         &uid,
         &content,
         &params.anti_content,
+        &params.anti_content_outer,
         &params.hash,
         &params.random,
         params.request_id,

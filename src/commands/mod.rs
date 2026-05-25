@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod greet;
 pub mod on_request;
 pub mod platform;

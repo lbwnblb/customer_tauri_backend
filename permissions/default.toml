@@ -1,6 +1,16 @@
 # 自定义命令权限定义
 
 [[permission]]
+identifier = "allow-on-login-success"
+description = "允许调用 on_login_success"
+commands.allow = ["on_login_success"]
+
+[[permission]]
+identifier = "allow-on-logout"
+description = "允许调用 on_logout"
+commands.allow = ["on_logout"]
+
+[[permission]]
 identifier = "allow-add-shop-channel"
 description = "允许调用 add_shop_channel"
 commands.allow = ["add_shop_channel"]

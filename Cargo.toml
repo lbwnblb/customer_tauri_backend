@@ -37,6 +37,7 @@ prost = "0.13"
 flate2 = "1"
 base64 = "0.22"
 url = "2"
+aes-gcm = "0.10"
 
 [dev-dependencies]
 wiremock = "0.6"
