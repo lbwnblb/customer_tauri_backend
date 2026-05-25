@@ -29,6 +29,7 @@
     "allow-pdd-ws-recv",
     "allow-pdd-ws-send",
     "allow-pdd-send-message",
+    "allow-check-token",
     "allow-on-login-success",
     "allow-on-logout"
   ]

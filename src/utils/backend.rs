@@ -7,10 +7,11 @@ use super::http::{HttpClient, HttpError, HttpResponse};
 // ── 通用后端响应包装 ────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
-struct BackendResp<T> {
+struct BackendResp {
     pub code: u16,
     pub message: String,
-    pub data: Option<T>,
+    #[serde(default)]
+    pub data: Option<serde_json::Value>,
 }
 
 // ── token 验证 ─────────────────────────────────────────────────────────────
@@ -18,8 +19,8 @@ struct BackendResp<T> {
 #[derive(Debug, Deserialize)]
 pub struct TokenVerifyData {
     pub valid: bool,
-    pub user_id: String,
-    pub expire_at: String,
+    pub user_id: serde_json::Value,
+    pub expire_at: serde_json::Value,
 }
 
 #[derive(Debug)]
@@ -58,15 +59,17 @@ pub async fn verify_token(token: &str) -> Result<TokenVerifyData, VerifyTokenErr
         .map_err(|e| VerifyTokenError::Http(e.to_string()))?;
 
     let status = resp.status().as_u16();
-    let body: BackendResp<TokenVerifyData> = resp
+    let body: BackendResp = resp
         .json()
         .await
         .map_err(|e| VerifyTokenError::Http(format!("响应解析失败: {e}")))?;
 
     match status {
-        200 => body
-            .data
-            .ok_or_else(|| VerifyTokenError::Http("响应缺少 data 字段".into())),
+        200 => {
+            let raw = body.data.ok_or_else(|| VerifyTokenError::Http("响应缺少 data 字段".into()))?;
+            serde_json::from_value(raw)
+                .map_err(|e| VerifyTokenError::Http(format!("data 解析失败: {e}")))
+        }
         401 => {
             if body.message.contains("过期") || body.message.contains("不存在") {
                 Err(VerifyTokenError::Expired)

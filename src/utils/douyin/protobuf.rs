@@ -8,6 +8,7 @@ use prost::{DecodeError, Message};
 use tauri::Webview;
 use crate::utils::{app_data, get_by_conversation};
 use crate::utils::douyin::doudian_utils::{build_get_conversation_info_list_v2_frame, build_get_conversation_info_list_v2_payload, build_send_frame, build_send_payload, SEQUENCE_ID, TICKET_NOTIFY_MAP};
+use crate::utils::douyin::message_converter::convert_messages;
 use crate::utils::douyin::protobuf::im_proto::{GetConversationInfoListV2ResponseBody, MessageBody, NewMessageNotify, Request, Response, ResponseBody};
 
 pub mod im_proto {
@@ -147,49 +148,54 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                                                                                 },
                                                                                                 message_type::MESSAGE_TYPE_50002 => {
                                                                                                     if on_notify(message) {
-                                                                                                        let conversation_short_id = message.conversation_short_id.clone();
-                                                                                                        // message.
-                                                                                                        //准备回复消息
-                                                                                                        let send_payload = match build_send_payload(webview, conversation_short_id, message.conversation_type, format!("我在:{}",SEQUENCE_ID.load(Ordering::Relaxed)), message.sub_conversation_short_id, message.security_conversation_id.clone()).await {
-                                                                                                            Ok(payload) => payload,
+                                                                                                        // let conversation_short_id = message.conversation_short_id.clone();
+                                                                                                        // // message.
+                                                                                                        // //准备回复消息
+                                                                                                        // let send_payload = match build_send_payload(webview, conversation_short_id, message.conversation_type, format!("我在:{}",SEQUENCE_ID.load(Ordering::Relaxed)), message.sub_conversation_short_id, message.security_conversation_id.clone()).await {
+                                                                                                        //     Ok(payload) => payload,
+                                                                                                        //     Err(e) => {
+                                                                                                        //         log::error!("build_send_payload failed: {}", e);
+                                                                                                        //         return;
+                                                                                                        //     }
+                                                                                                        // };
+                                                                                                        // info!("[IM] [RECV] MESSAGE_TYPE_50002  send_payload:{:?}",send_payload);
+                                                                                                        //  // Request::se
+                                                                                                        // let send_payload = send_payload.encode_to_vec();
+                                                                                                        // let mut send_frame = build_send_frame(webview);
+                                                                                                        // info!("[IM] [RECV] MESSAGE_TYPE_50002  send_frame:{:?}",send_frame);
+                                                                                                        // send_frame.payload = Some(send_payload.to_vec());
+                                                                                                        // let frame_bytes = send_frame.encode_to_vec();
+                                                                                                        // // 转成 JS 能识别的字节数组字面量
+                                                                                                        // let js_bytes = format!("{:?}", frame_bytes); // "[1, 2, 3, ...]"
+                                                                                                        //
+                                                                                                        // let js = format!(
+                                                                                                        //     r#"
+                                                                                                        //         (() => {{
+                                                                                                        //             const ws = window.__WS_INSTANCE__;
+                                                                                                        //             if (ws && ws.readyState === 1) {{
+                                                                                                        //                 ws.send(new Uint8Array({}).buffer);
+                                                                                                        //             }}
+                                                                                                        //         }})()
+                                                                                                        //         "#,
+                                                                                                        //     js_bytes
+                                                                                                        // );
+                                                                                                        // webview.eval(&js).ok();
+
+                                                                                                        // info!("[IM] [RECV] conversation_short_id 消息通知:{:?}  index_cmd_message:{:?}",message.conversation_short_id,has_new_message_notify.cmd_message_index);
+                                                                                                        match get_by_conversation(webview, message.security_conversation_id.clone().unwrap().as_str(), message.conversation_short_id.unwrap()).await {
+                                                                                                            Ok(conversation) => {
+                                                                                                                let messages = convert_messages(conversation);
+                                                                                                                // info!("[IM] [RECV] 获取会话消息:{:?}",messages);
+                                                                                                                for message in messages {
+                                                                                                                    info!("[IM] [RECV] 获取会话消息:{:?}",message);
+                                                                                                                }
+                                                                                                            }
                                                                                                             Err(e) => {
-                                                                                                                log::error!("build_send_payload failed: {}", e);
-                                                                                                                return;
+                                                                                                                warn!("[IM] [RECV] 获取会话失败:{:?}",e);
                                                                                                             }
                                                                                                         };
-                                                                                                        info!("[IM] [RECV] MESSAGE_TYPE_50002  send_payload:{:?}",send_payload);
-                                                                                                         // Request::se
-                                                                                                        let send_payload = send_payload.encode_to_vec();
-                                                                                                        let mut send_frame = build_send_frame(webview);
-                                                                                                        info!("[IM] [RECV] MESSAGE_TYPE_50002  send_frame:{:?}",send_frame);
-                                                                                                        send_frame.payload = Some(send_payload.to_vec());
-                                                                                                        let frame_bytes = send_frame.encode_to_vec();
-                                                                                                        // 转成 JS 能识别的字节数组字面量
-                                                                                                        let js_bytes = format!("{:?}", frame_bytes); // "[1, 2, 3, ...]"
-
-                                                                                                        let js = format!(
-                                                                                                            r#"
-                                                                                                                (() => {{
-                                                                                                                    const ws = window.__WS_INSTANCE__;
-                                                                                                                    if (ws && ws.readyState === 1) {{
-                                                                                                                        ws.send(new Uint8Array({}).buffer);
-                                                                                                                    }}
-                                                                                                                }})()
-                                                                                                                "#,
-                                                                                                            js_bytes
-                                                                                                        );
-                                                                                                        webview.eval(&js).ok();
-
                                                                                                     }
-                                                                                                    // info!("[IM] [RECV] conversation_short_id 消息通知:{:?}  index_cmd_message:{:?}",message.conversation_short_id,has_new_message_notify.cmd_message_index);
-                                                                                                    // match get_by_conversation(webview, message.security_conversation_id.clone().unwrap().as_str(), message.conversation_short_id.unwrap()).await {
-                                                                                                    //     Ok(conversation) => {
-                                                                                                    //
-                                                                                                    //     }
-                                                                                                    //     Err(e) => {
-                                                                                                    //         warn!("[IM] [RECV] 获取会话失败:{:?}",e);
-                                                                                                    //     }
-                                                                                                    // };
+
                                                                                                 }
                                                                                                 _ => {}
                                                                                             }

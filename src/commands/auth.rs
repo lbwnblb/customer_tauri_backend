@@ -33,6 +33,25 @@ pub async fn on_login_success(window: Window) {
     }
 }
 
+/// 从前端传入 token，验证有效性。
+/// 有效时直接触发 on_login_success 完成跳转；无效时返回 Err。
+#[tauri::command]
+pub async fn check_token(token: String, window: Window) -> Result<(), String> {
+    match crate::utils::backend::verify_token(&token).await {
+        Ok(data) => {
+            log::info!("[check_token] token 有效, user_id={}", data.user_id);
+            tauri::async_runtime::spawn(async move {
+                on_login_success(window).await;
+            });
+            Ok(())
+        }
+        Err(e) => {
+            log::warn!("[check_token] token 验证失败: {e}");
+            Err(e.to_string())
+        }
+    }
+}
+
 /// 主动登出：清除本地 token 并切换回登录页。
 ///
 /// 流程：

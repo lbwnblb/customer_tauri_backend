@@ -1,6 +1,6 @@
 pub mod app_data;
 pub mod backend;
-pub mod cookie;
+pub mod message;
 pub mod env;
 pub mod uuid;
 pub mod timestamp;
@@ -18,4 +18,4 @@ pub use platform::{get_platform_from_id, is_douyin_platform, is_pinduoduo_platfo
 pub use constants::{PLATFORM_DOUYIN, PLATFORM_PINDUODUO, PLATFORM_UNKNOWN};
 pub use logger::init_logger;
 pub use http::{get, get_json, get_with_timeout, post_json, HttpClient, HttpError, HttpErrorKind, HttpResponse};
-pub use douyin::feige_resp::{get_by_conversation, get_message_by_index_v2_range};
+pub use douyin::feige_resp::{get_by_conversation};

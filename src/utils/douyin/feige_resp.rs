@@ -301,91 +301,6 @@ pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<Feige
     }
 }
 
-pub async fn get_message_by_index_v2_range(
-    webview: &Webview,
-    conversation_id: &str,
-    security_conversation_id: &str,
-    conversation_short_id: i64,
-    min_index: i64,
-    max_index: i64,
-) -> Result<Vec<im_proto::MessageInfo>, Box<dyn std::error::Error>> {
-    let cookie_str = get_webview_cookie(webview);
-    let pigeon_sign = PIGEON_SIGN_MAP
-        .lock()
-        .unwrap()
-        .get(webview.label())
-        .cloned()
-        .unwrap_or_default();
-
-    if pigeon_sign.is_empty() {
-        info!("[get_message] PIGEON_SIGN_MAP 中未找到 webview={} 的 pigeon_sign", webview.label());
-    }
-
-    let request_body = im_proto::GetMessageInfoByIndexV2RangeRequestBody {
-        conversation_id: Some(conversation_id.to_string()),
-        conversation_type: Some(1),
-        conversation_short_id: Some(conversation_short_id),
-        min_index_in_conversation_v2: min_index,
-        max_index_in_conversation_v2: max_index,
-        direction: Some(1),
-        security_conversation_id: Some(security_conversation_id.to_string()),
-        ..Default::default()
-    };
-
-    let mut request = im_proto::Request::default();
-    request.cmd = Some(2041);
-    request.body = Some(im_proto::RequestBody {
-        get_message_info_by_index_v2_range_body: Some(request_body),
-        ..Default::default()
-    });
-
-    let mut url = Url::parse(&format!("{}/pigeon_im/v1/message/get_message_info_by_index_v2_range", FEIGE_BASE_URL)).unwrap();
-    url.query_pairs_mut()
-        .append_pair("pigeon_source", "web")
-        .append_pair("PIGEON_BIZ_TYPE", "2")
-        .append_pair("pigeon_sign", &pigeon_sign);
-
-    let resp_bytes = HttpClient::new()
-        .request_raw(
-            reqwest::Method::POST,
-            url.as_str(),
-            request.encode_to_vec(),
-            Some(&[
-                ("content-type", "application/x-protobuf"),
-                ("accept", "application/x-protobuf"),
-                ("cookie", &cookie_str),
-                ("origin", "https://im.jinritemai.com"),
-                ("referer", "https://im.jinritemai.com/"),
-            ]),
-        )
-        .await?;
-
-    let response = im_proto::Response::decode(resp_bytes.as_slice())?;
-    info!("[get_message] response: {:?}", response);
-
-    if response.status_code != Some(0) {
-        info!("[get_message] 请求失败, url: {}, request: {:?}", url, request);
-    }
-
-    let body = response.body.ok_or("Response 缺少 body")?;
-    let range_body = body
-        .get_message_info_by_index_v2_range_body
-        .ok_or("缺少 get_message_info_by_index_v2_range_body")?;
-
-    for info in &range_body.infos {
-        if let Some(msg) = &info.body {
-            info!(
-                "[get_message] conversation_id={:?} sender={:?} message_type={:?} content={}",
-                msg.conversation_id,
-                msg.sender,
-                msg.message_type,
-                msg.content.as_deref().unwrap_or(""),
-            );
-        }
-    }
-
-    Ok(range_body.infos)
-}
 
 pub async fn get_by_conversation(
     webview: &Webview,
@@ -411,7 +326,7 @@ pub async fn get_by_conversation(
         conversation_short_id: Some(conversation_short_id),
         direction: Some(1),
         anchor_index: Some(0),
-        limit: Some(12),
+        limit: Some(14),
         security_conversation_id: Some(security_conversation_id.to_string()),
         ..Default::default()
     };
@@ -483,7 +398,7 @@ pub async fn get_by_conversation(
     // info!("[get_by_conversation] resp hex: {}", hex::encode(&resp_bytes));
 
     let response = im_proto::Response::decode(resp_bytes.as_slice())?;
-    // info!("[get_by_conversation] response: {:?}", response);
+    // println!("[get_by_conversation] response: {:?}", response);
 
     if response.status_code != Some(0) {
         info!("[get_by_conversation] 请求失败, url: {}, request: {:?}", url, request);
@@ -494,15 +409,49 @@ pub async fn get_by_conversation(
         .messages_in_conversation_body
         .ok_or("缺少 messages_in_conversation_body")?;
 
-    for msg in &conv_body.messages {
-        info!(
-            "[get_by_conversation] conversation_id={:?} sender={:?} message_type={:?} content={}",
-            msg.conversation_id,
-            msg.sender,
-            msg.message_type,
-            msg.content.as_deref().unwrap_or(""),
-        );
+
+    let messages: Vec<_> = conv_body.messages.into_iter().filter(|msg| {
+        msg.message_type == Some(1000)
+            && msg.ext.get("s:sender_biz_role")
+                .map(|r| r == "Buyer" || r == "CurrentServer")
+                .unwrap_or(false)
+            && msg.ext.get("type").map(|t| t != "allocated_service").unwrap_or(true)
+    }).collect();
+
+    for msg in &messages {
+        let role = msg.ext.get("s:sender_biz_role").map(|s| s.as_str()).unwrap_or("unknown");
+        let msg_type = msg.ext.get("type").map(|s| s.as_str()).unwrap_or("");
+        let content = msg.content.as_deref().unwrap_or("");
+
+        match msg_type {
+            "template_card" => {
+                let goods_id = msg.ext.get("goods_id").map(|s| s.as_str()).unwrap_or("");
+                let img = msg.ext.get("static_data")
+                    .and_then(|sd| serde_json::from_str::<serde_json::Value>(sd).ok())
+                    .and_then(|v| {
+                        v.get("sale_goods")?.get(0)?.get("img")?.as_str().map(|s| s.to_string())
+                    })
+                    .unwrap_or_default();
+                info!(
+                    "[get_by_conversation] role={} type={} goods_id={} img={}",
+                    role, msg_type, goods_id, img
+                );
+            }
+            "file_image" => {
+                let image_url = msg.ext.get("imageUrl").map(|s| s.as_str()).unwrap_or("");
+                info!(
+                    "[get_by_conversation] role={} type={} imageUrl={}",
+                    role, msg_type, image_url
+                );
+            }
+            _ => {
+                info!(
+                    "[get_by_conversation] role={} type={} content={}",
+                    role, msg_type, content
+                );
+            }
+        }
     }
 
-    Ok(conv_body.messages)
+    Ok(messages)
 }

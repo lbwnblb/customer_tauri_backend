@@ -1,6 +1,11 @@
 # 自定义命令权限定义
 
 [[permission]]
+identifier = "allow-check-token"
+description = "允许调用 check_token"
+commands.allow = ["check_token"]
+
+[[permission]]
 identifier = "allow-on-login-success"
 description = "允许调用 on_login_success"
 commands.allow = ["on_login_success"]
