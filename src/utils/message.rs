@@ -9,6 +9,18 @@ pub struct Message {
     pub msg_type: u8,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reply {
+    pub role: String,
+    pub content: String,
+    #[serde(rename = "type")]
+    pub msg_type: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub product_id: Option<i64>,
+}
+
+
 /// 角色常量
 pub const ROLE_ASSISTANT: &str = "assistant";
 pub const ROLE_USER: &str = "user";

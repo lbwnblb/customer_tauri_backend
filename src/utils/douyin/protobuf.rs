@@ -1,15 +1,10 @@
 use std::collections::HashMap;
-use std::error::Error;
-use std::fs;
-use std::sync::{Arc, LazyLock, Mutex};
-use std::sync::atomic::Ordering;
+use std::sync::{LazyLock, Mutex};
 use log::{info, warn};
-use prost::{DecodeError, Message};
+use prost::Message;
 use tauri::Webview;
-use crate::utils::{app_data, get_by_conversation};
-use crate::utils::douyin::doudian_utils::{build_get_conversation_info_list_v2_frame, build_get_conversation_info_list_v2_payload, build_send_frame, build_send_payload, SEQUENCE_ID, TICKET_NOTIFY_MAP};
-use crate::utils::douyin::message_converter::convert_messages;
-use crate::utils::douyin::protobuf::im_proto::{GetConversationInfoListV2ResponseBody, MessageBody, NewMessageNotify, Request, Response, ResponseBody};
+use crate::utils::douyin::doudian_utils::{TICKET_NOTIFY_MAP};
+use crate::utils::douyin::protobuf::im_proto::{MessageBody};
 
 pub mod im_proto {
     include!(concat!(env!("OUT_DIR"), "/dy_im_proto.rs"));
@@ -20,6 +15,8 @@ pub static SEND_REQUEST_MAP: LazyLock<Mutex<HashMap<String, im_proto::Request>>>
 
 pub static TICKET_MAP: LazyLock<Mutex<HashMap<i64, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+
 
 
 pub mod cmd_status {
@@ -85,6 +82,45 @@ pub mod message_type {
     pub const MESSAGE_TYPE_50002:i32 = 50002;
 }
 
+/// 打印消息中所有可能记录"用户从哪个商品进来"的字段，用于探查 ext key。
+/// 在 cmd=500 新消息通知里对每条消息调用一次。
+fn dump_entry_product(label: &str, message: &im_proto::MessageBody) {
+    let short_id  = message.conversation_short_id.unwrap_or(0);
+    let msg_type  = message.message_type.unwrap_or(0);
+    let role      = message.ext.get("s:sender_biz_role").map(|s| s.as_str()).unwrap_or("?");
+    let dy_type   = message.ext.get("type").map(|s| s.as_str()).unwrap_or("?");
+    let content   = message.content.as_deref().unwrap_or("");
+
+    // 已知可能携带来源商品的 key
+    const PRODUCT_KEYS: &[&str] = &[
+        "source_goods_id",
+        "goods_id",
+        "product_id",
+        "s:source_goods_id",
+        "source_type",
+        "origin_type",
+        "source_page",
+        "enter_from",
+        "promotion_id",
+        "item_id",
+        "sku_id",
+    ];
+
+    let found: Vec<String> = PRODUCT_KEYS
+        .iter()
+        .filter_map(|k| message.ext.get(*k).map(|v| format!("{}={}", k, v)))
+        .collect();
+
+    info!(
+        "[ENTRY_PRODUCT] webview={} cid={} msg_type={} role={} dy_type={} | product_keys=[{}] | content={:?} | full_ext={:?}",
+        label, short_id, msg_type, role, dy_type,
+        found.join(", "),
+        &content[..content.len().min(200)],
+        message.ext
+    );
+}
+
+
 pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
     let webview_id = webview.label().to_string();
     let  frame = match im_proto::Frame::decode(bytes) {
@@ -121,6 +157,8 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                                     match has_new_message_notify.message {
                                                         None => {}
                                                         Some(ref message) => {
+                                                            // 诊断：打印每条消息的入口商品相关字段
+                                                            // dump_entry_product(&webview_id, message);
                                                             match message.message_type {
                                                                 None => {}
                                                                 Some(ref message_type) => {
@@ -147,55 +185,11 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                                                                                     }
                                                                                                 },
                                                                                                 message_type::MESSAGE_TYPE_50002 => {
-                                                                                                    if on_notify(message) {
-                                                                                                        // let conversation_short_id = message.conversation_short_id.clone();
-                                                                                                        // // message.
-                                                                                                        // //准备回复消息
-                                                                                                        // let send_payload = match build_send_payload(webview, conversation_short_id, message.conversation_type, format!("我在:{}",SEQUENCE_ID.load(Ordering::Relaxed)), message.sub_conversation_short_id, message.security_conversation_id.clone()).await {
-                                                                                                        //     Ok(payload) => payload,
-                                                                                                        //     Err(e) => {
-                                                                                                        //         log::error!("build_send_payload failed: {}", e);
-                                                                                                        //         return;
-                                                                                                        //     }
-                                                                                                        // };
-                                                                                                        // info!("[IM] [RECV] MESSAGE_TYPE_50002  send_payload:{:?}",send_payload);
-                                                                                                        //  // Request::se
-                                                                                                        // let send_payload = send_payload.encode_to_vec();
-                                                                                                        // let mut send_frame = build_send_frame(webview);
-                                                                                                        // info!("[IM] [RECV] MESSAGE_TYPE_50002  send_frame:{:?}",send_frame);
-                                                                                                        // send_frame.payload = Some(send_payload.to_vec());
-                                                                                                        // let frame_bytes = send_frame.encode_to_vec();
-                                                                                                        // // 转成 JS 能识别的字节数组字面量
-                                                                                                        // let js_bytes = format!("{:?}", frame_bytes); // "[1, 2, 3, ...]"
-                                                                                                        //
-                                                                                                        // let js = format!(
-                                                                                                        //     r#"
-                                                                                                        //         (() => {{
-                                                                                                        //             const ws = window.__WS_INSTANCE__;
-                                                                                                        //             if (ws && ws.readyState === 1) {{
-                                                                                                        //                 ws.send(new Uint8Array({}).buffer);
-                                                                                                        //             }}
-                                                                                                        //         }})()
-                                                                                                        //         "#,
-                                                                                                        //     js_bytes
-                                                                                                        // );
-                                                                                                        // webview.eval(&js).ok();
-
-                                                                                                        // info!("[IM] [RECV] conversation_short_id 消息通知:{:?}  index_cmd_message:{:?}",message.conversation_short_id,has_new_message_notify.cmd_message_index);
-                                                                                                        match get_by_conversation(webview, message.security_conversation_id.clone().unwrap().as_str(), message.conversation_short_id.unwrap()).await {
-                                                                                                            Ok(conversation) => {
-                                                                                                                let messages = convert_messages(conversation);
-                                                                                                                // info!("[IM] [RECV] 获取会话消息:{:?}",messages);
-                                                                                                                for message in messages {
-                                                                                                                    info!("[IM] [RECV] 获取会话消息:{:?}",message);
-                                                                                                                }
-                                                                                                            }
-                                                                                                            Err(e) => {
-                                                                                                                warn!("[IM] [RECV] 获取会话失败:{:?}",e);
-                                                                                                            }
-                                                                                                        };
+                                                                                                    super::auto_reply::record_shark_product_id(webview, message);
+                                                                                                    if super::auto_reply::on_notify(message) {
+                                                                                                        super::auto_reply::schedule_auto_reply(webview.clone(), message).await;
+                                                                                                        // info!("MESSAGE_TYPE_50002 message:{:?}",message);
                                                                                                     }
-
                                                                                                 }
                                                                                                 _ => {}
                                                                                             }
@@ -217,43 +211,21 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                     }
                                 }
                                 cmd_status::GET_CONVERSATION_INFO_LIST_V2_BODY=>{
-                                    // info!("[IM] [RECV] GET_CONVERSATION_INFO_LIST_V2_BODY:{:?}",response.body);
-                                    match response.body {
-                                        None => {}
-                                        Some(body) => {
-                                            match body.get_conversation_info_list_v2_body {
-                                                None => {}
-                                                Some(get_conversation_info_list_v2_body) => {
-                                                    for conversationinfov2 in get_conversation_info_list_v2_body.conversation_info_list {
-
-                                                        match conversationinfov2.conversation_short_id {
-                                                            None => {}
-                                                            Some(conversation_short_id) => {
-                                                                let conversation_short_id_str = conversation_short_id.to_string();
-                                                                if let Some(ref ticket) = conversationinfov2.ticket {
-                                                                    TICKET_MAP.lock().unwrap().insert(conversation_short_id, ticket.clone());
-                                                                    if let Some(notify) = TICKET_NOTIFY_MAP.lock().unwrap().get(&conversation_short_id) {
-                                                                        notify.notify_one();
-                                                                    }
-                                                                }
-                                                                let dir = app_data::response_cmd_610_get_conversation_info_list_v2_body();
-                                                                let _ = fs::create_dir_all(&dir);
-                                                                let file_path = format!("{}/{}.json", dir, conversation_short_id_str);
-                                                                match serde_json::to_string_pretty(&conversationinfov2) {
-                                                                    Ok(json) => {
-                                                                        if let Err(e) = fs::write(&file_path, &json) {
-                                                                            warn!("[IM] [RECV] 写入会话信息失败 {}: {}", file_path, e);
-                                                                        }
-                                                                    }
-                                                                    Err(e) => {
-                                                                        warn!("[IM] [RECV] 序列化会话信息失败: {}", e);
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
+                                    if let Some(ref body) = response.body {
+                                        if let Some(ref conv_list) = body.get_conversation_info_list_v2_body {
+                                            let mut ticket_map = TICKET_MAP.lock().unwrap();
+                                            let notify_map = TICKET_NOTIFY_MAP.lock().unwrap();
+                                            for conv in &conv_list.conversation_info_list {
+                                                if let (Some(short_id), Some(ref ticket)) = (conv.conversation_short_id, &conv.ticket) {
+                                                    info!("[IM] [RECV] GET_CONVERSATION_INFO_LIST_V2 ticket cached: cid={} ticket={}", short_id, ticket);
+                                                    ticket_map.insert(short_id, ticket.clone());
+                                                    if let Some(notify) = notify_map.get(&short_id) {
+                                                        notify.notify_one();
                                                     }
                                                 }
                                             }
+                                        } else {
+                                            warn!("[IM] [RECV] GET_CONVERSATION_INFO_LIST_V2 body 为空");
                                         }
                                     }
                                 }
@@ -270,115 +242,6 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
     }
 
 }
-fn on_notify(msg: &MessageBody) -> bool {
-    // 带 LLM 增值字段的是第二条补充推送，直接丢弃
-    if msg.ext.contains_key("llm_intent_label") {
-        return false; // 忽略
-    }
-    true // 正常处理
-}
-pub fn new_send_request(cmd: i32, seqid: i64, body: im_proto::RequestBody) -> im_proto::Request {
-    im_proto::Request {
-        cmd: Some(cmd),
-        sequence_id: Some(seqid),
-        sdk_version: None,
-        token: None,
-        refer: None,
-        inbox_type: None,
-        build_number: None,
-        body: Some(body),
-        device_id: None,
-        channel: None,
-        device_platform: None,
-        device_type: None,
-        os_version: None,
-        version_code: None,
-        headers: HashMap::new(),
-        config_id: None,
-        token_info: None,
-        auth_type: None,
-        msg_trace: None,
-        retry_count: None,
-        biz: None,
-        access: None,
-    }
-}
-
-pub fn merge_request(existing: &mut im_proto::Request, incoming: im_proto::Request) {
-    if incoming.cmd.is_some() { existing.cmd = incoming.cmd; }
-    if incoming.sequence_id.is_some() { existing.sequence_id = incoming.sequence_id; }
-    if incoming.sdk_version.is_some() { existing.sdk_version = incoming.sdk_version; }
-    if incoming.token.is_some() { existing.token = incoming.token; }
-    if incoming.refer.is_some() { existing.refer = incoming.refer; }
-    if incoming.inbox_type.is_some() { existing.inbox_type = incoming.inbox_type; }
-    if incoming.build_number.is_some() { existing.build_number = incoming.build_number; }
-    if incoming.device_id.is_some() { existing.device_id = incoming.device_id; }
-    if incoming.channel.is_some() { existing.channel = incoming.channel; }
-    if incoming.device_platform.is_some() { existing.device_platform = incoming.device_platform; }
-    if incoming.device_type.is_some() { existing.device_type = incoming.device_type; }
-    if incoming.os_version.is_some() { existing.os_version = incoming.os_version; }
-    if incoming.version_code.is_some() { existing.version_code = incoming.version_code; }
-    if incoming.config_id.is_some() { existing.config_id = incoming.config_id; }
-    if incoming.auth_type.is_some() { existing.auth_type = incoming.auth_type; }
-    if incoming.retry_count.is_some() { existing.retry_count = incoming.retry_count; }
-    if incoming.biz.is_some() { existing.biz = incoming.biz; }
-    if incoming.access.is_some() { existing.access = incoming.access; }
-    // 逐 key 合并 headers
-    for (k, v) in incoming.headers {
-        existing.headers.insert(k, v);
-    }
-    // 子消息精细合并
-    if let Some(incoming_body) = incoming.body {
-        merge_request_body(existing.body.get_or_insert_with(Default::default), incoming_body);
-    }
-    if let Some(incoming_token_info) = incoming.token_info {
-        let t = existing.token_info.get_or_insert_with(Default::default);
-        if incoming_token_info.mark_id.is_some() { t.mark_id = incoming_token_info.mark_id; }
-        if incoming_token_info.r#type.is_some() { t.r#type = incoming_token_info.r#type; }
-        if incoming_token_info.app_id.is_some() { t.app_id = incoming_token_info.app_id; }
-        if incoming_token_info.user_id.is_some() { t.user_id = incoming_token_info.user_id; }
-        if incoming_token_info.timestamp.is_some() { t.timestamp = incoming_token_info.timestamp; }
-    }
-    if let Some(incoming_trace) = incoming.msg_trace {
-        let t = existing.msg_trace.get_or_insert_with(Default::default);
-        if incoming_trace.path.is_some() { t.path = incoming_trace.path; }
-        for (k, v) in incoming_trace.metrics {
-            t.metrics.insert(k, v);
-        }
-    }
-}
-
-fn merge_request_body(existing: &mut im_proto::RequestBody, incoming: im_proto::RequestBody) {
-    if let Some(v) = incoming.send_message_body {
-        merge_send_message_body(existing.send_message_body.get_or_insert_with(Default::default), v);
-    }
-}
-
-fn merge_send_message_body(existing: &mut im_proto::SendMessageRequestBody, incoming: im_proto::SendMessageRequestBody) {
-    if incoming.conversation_id.is_some() { existing.conversation_id = incoming.conversation_id; }
-    if incoming.conversation_type.is_some() { existing.conversation_type = incoming.conversation_type; }
-    if incoming.conversation_short_id.is_some() { existing.conversation_short_id = incoming.conversation_short_id; }
-    if incoming.content.is_some() { existing.content = incoming.content; }
-    if incoming.message_type.is_some() { existing.message_type = incoming.message_type; }
-    if incoming.ticket.is_some() { existing.ticket = incoming.ticket; }
-    if incoming.client_message_id.is_some() { existing.client_message_id = incoming.client_message_id; }
-    if incoming.ignore_badge_count.is_some() { existing.ignore_badge_count = incoming.ignore_badge_count; }
-    if incoming.unuse_field1.is_some() { existing.unuse_field1 = incoming.unuse_field1; }
-    if incoming.sub_conversation_short_id.is_some() { existing.sub_conversation_short_id = incoming.sub_conversation_short_id; }
-    if incoming.security_conversation_id.is_some() { existing.security_conversation_id = incoming.security_conversation_id; }
-    if incoming.security_to_user_id.is_some() { existing.security_to_user_id = incoming.security_to_user_id; }
-    if !incoming.mentioned_users.is_empty() { existing.mentioned_users = incoming.mentioned_users; }
-    if !incoming.security_mentioned_users.is_empty() { existing.security_mentioned_users = incoming.security_mentioned_users; }
-    if incoming.ref_msg_info.is_some() { existing.ref_msg_info = incoming.ref_msg_info; }
-    // 逐 key 合并 HashMap 字段
-    for (k, v) in incoming.ext {
-        existing.ext.insert(k, v);
-    }
-    for (k, v) in incoming.client_ext {
-        existing.client_ext.insert(k, v);
-    }
-}
-
 pub async fn feige_im_send(webview: &Webview, bytes: &[u8]) {
     let webview_id = webview.label().to_string();
     let frame = match im_proto::Frame::decode(bytes) {
@@ -398,8 +261,8 @@ pub async fn feige_im_send(webview: &Webview, bytes: &[u8]) {
                         Some(cmd) => {
                             match cmd {
                                 cmd_status::GET_CONVERSATION_INFO_LIST_V2_BODY => {
-                                    info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY seqid={} logid={} service={} method={} headers={:?} payload_encoding={:?} payload_type={:?}", frame.seqid, frame.logid, frame.service, frame.method, frame.headers, frame.payload_encoding, frame.payload_type);
-                                    info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY request={:?}", request);
+                                    // info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY seqid={} logid={} service={} method={} headers={:?} payload_encoding={:?} payload_type={:?}", frame.seqid, frame.logid, frame.service, frame.method, frame.headers, frame.payload_encoding, frame.payload_type);
+                                    // info!("[IM] [SEND] GET_CONVERSATION_INFO_LIST_V2_BODY request={:?}", request);
                                 }
                                 _=> {}
                             }

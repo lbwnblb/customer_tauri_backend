@@ -1,0 +1,13 @@
+{
+  "identifier": "promo-h5-remote",
+  "webviews": ["promo_h5_*"],
+  "remote": {
+    "urls": [
+      "https://haohuo.jinritemai.com/*"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "allow-on-promotion-pack-h5"
+  ]
+}

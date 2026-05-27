@@ -40,6 +40,7 @@ pub async fn check_token(token: String, window: Window) -> Result<(), String> {
     match crate::utils::backend::verify_token(&token).await {
         Ok(data) => {
             log::info!("[check_token] token 有效, user_id={}", data.user_id);
+            crate::utils::backend::set_app_token(&token);
             tauri::async_runtime::spawn(async move {
                 on_login_success(window).await;
             });

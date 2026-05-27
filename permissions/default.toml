@@ -120,3 +120,23 @@ identifier = "allow-pdd-crypto-callback"
 description = "允许 JS webview 回调加密参数"
 commands.allow = ["pdd_crypto_callback"]
 
+[[permission]]
+identifier = "allow-account-query"
+description = "允许调用 account_query"
+commands.allow = ["account_query"]
+
+[[permission]]
+identifier = "allow-add-qa"
+description = "允许调用 add_qa"
+commands.allow = ["add_qa"]
+
+[[permission]]
+identifier = "allow-redeem-query"
+description = "允许调用 redeem_query"
+commands.allow = ["redeem_query"]
+
+[[permission]]
+identifier = "allow-on-promotion-pack-h5"
+description = "允许 promo_h5 隐藏 webview 回调 promotion pack h5 响应"
+commands.allow = ["on_promotion_pack_h5"]
+

@@ -133,6 +133,60 @@ pub fn create_douyin_webview(
 
     Ok(id)
 }
+pub fn create_account_webview(window: &Window, w: f64, h: f64) -> Result<(), tauri::Error> {
+    let id = "08_account".to_string();
+
+    park_other_08_webviews(window, &id);
+
+    window.add_child(
+        WebviewBuilder::new(&id, WebviewUrl::App("account.html".into()))
+            .data_directory(app_data_dir_home_index()),
+        tauri::LogicalPosition::new(w * 0.2, 0.0),
+        tauri::LogicalSize::new(w * 0.8, h),
+    )?;
+    WEBVIEW_IDS.lock().unwrap().push(id.clone());
+
+    set_active_08(Some(id));
+
+    Ok(())
+}
+
+pub fn create_qa_webview(window: &Window, w: f64, h: f64) -> Result<(), tauri::Error> {
+    let id = "08_qa".to_string();
+
+    park_other_08_webviews(window, &id);
+
+    window.add_child(
+        WebviewBuilder::new(&id, WebviewUrl::App("qa.html".into()))
+            .data_directory(app_data_dir_home_index()),
+        tauri::LogicalPosition::new(w * 0.2, 0.0),
+        tauri::LogicalSize::new(w * 0.8, h),
+    )?;
+    WEBVIEW_IDS.lock().unwrap().push(id.clone());
+
+    set_active_08(Some(id));
+
+    Ok(())
+}
+
+pub fn create_redeem_webview(window: &Window, w: f64, h: f64) -> Result<(), tauri::Error> {
+    let id = "08_redeem".to_string();
+
+    park_other_08_webviews(window, &id);
+
+    window.add_child(
+        WebviewBuilder::new(&id, WebviewUrl::App("redeem.html".into()))
+            .data_directory(app_data_dir_home_index()),
+        tauri::LogicalPosition::new(w * 0.2, 0.0),
+        tauri::LogicalSize::new(w * 0.8, h),
+    )?;
+    WEBVIEW_IDS.lock().unwrap().push(id.clone());
+
+    set_active_08(Some(id));
+
+    Ok(())
+}
+
 pub fn create_pinduoduo_webview(
     window: &Window,
     w: f64,

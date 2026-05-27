@@ -1,7 +1,11 @@
+pub mod account;
 pub mod auth;
+pub mod qa;
+pub mod redeem;
 pub mod greet;
 pub mod on_request;
 pub mod platform;
+pub mod promotion_h5;
 pub mod shop;
 pub mod webview_utils;
 pub mod shop_callback;

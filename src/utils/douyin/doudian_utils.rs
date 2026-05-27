@@ -69,7 +69,7 @@ pub  fn get_current_shop_id(webview: &Webview)-> Result<String,()>{
     Err(())
 }
 
-pub async fn build_send_payload(webview: &Webview,conversation_short_id:Option<i64>,conversation_type:Option<i32>,content:String,sub_conversation_short_id:Option<i64>,security_conversation_id:Option<String>) ->Result<Request, String>{
+pub async fn build_send_payload(webview: &Webview,conversation_short_id:Option<i64>,content:String,sub_conversation_short_id:Option<i64>,security_conversation_id:Option<String>) ->Result<Request, String>{
     let ticket = match conversation_short_id.and_then(|id| TICKET_MAP.lock().unwrap().get(&id).cloned()) {
         Some(t) => t,
         None => {

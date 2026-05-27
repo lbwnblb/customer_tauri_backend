@@ -14,7 +14,7 @@ pub(crate) mod pinduoduo;
 pub use app_data::app_data_dir;
 pub use uuid::uuid_no_hyphen;
 pub use timestamp::timestamp_millis;
-pub use platform::{get_platform_from_id, is_douyin_platform, is_pinduoduo_platform};
+pub use platform::{get_platform_from_id, is_douyin_platform, is_pinduoduo_platform, platform_id_from_webview_id};
 pub use constants::{PLATFORM_DOUYIN, PLATFORM_PINDUODUO, PLATFORM_UNKNOWN};
 pub use logger::init_logger;
 pub use http::{get, get_json, get_with_timeout, post_json, HttpClient, HttpError, HttpErrorKind, HttpResponse};

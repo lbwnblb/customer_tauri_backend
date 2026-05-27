@@ -18,3 +18,13 @@ pub fn get_platform_from_id(id: &str) -> String {
         _ => PLATFORM_UNKNOWN_CN.to_string(),
     }
 }
+
+/// 从 webview id 中提取平台英文标识符（"douyin" / "pinduoduo"），未知平台返回 None。
+pub fn platform_id_from_webview_id(webview_id: &str) -> Option<&'static str> {
+    let part = webview_id.split('_').nth(1)?;
+    match part {
+        PLATFORM_DOUYIN => Some(PLATFORM_DOUYIN),
+        PLATFORM_PINDUODUO => Some(PLATFORM_PINDUODUO),
+        _ => None,
+    }
+}

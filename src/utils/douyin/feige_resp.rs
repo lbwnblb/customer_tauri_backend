@@ -3,11 +3,11 @@ use std::sync::{LazyLock, Mutex};
 
 use log::info;
 use prost::Message;
-use url::Url;
+use crate::commands::shop_callback::FEIGE_MANAGEMENT_COOKIE;
 use crate::utils::douyin::protobuf::im_proto;
 use crate::utils::HttpClient;
 use serde::{Deserialize, Serialize};
-use tauri::Webview;
+use tauri::{Webview, Window};
 
 const FEIGE_BASE_URL: &str = "https://fxg.jinritemai.com";
 
@@ -205,6 +205,21 @@ fn get_webview_cookie(webview: &Webview) -> String {
         .unwrap_or_default()
 }
 
+fn get_management_cookie(webview_id: &str) -> String {
+    FEIGE_MANAGEMENT_COOKIE
+        .lock()
+        .unwrap()
+        .get(webview_id)
+        .map(|cookies| {
+            cookies
+                .iter()
+                .map(|c| format!("{}={}", c.name(), c.value()))
+                .collect::<Vec<_>>()
+                .join("; ")
+        })
+        .unwrap_or_default()
+}
+
 pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<FeigeShopInfoResponse, Box<dyn std::error::Error>> {
     let cookie_str = get_webview_cookie(webview);
 
@@ -301,6 +316,445 @@ pub async fn feige_shop_info(webview_id: &str,webview: &Webview) -> Result<Feige
     }
 }
 
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiagnoseAlertDialog {
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub switch_dialog: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiagnoseIgnoreOperation {
+    pub name: Option<String>,
+    pub key: Option<String>,
+    pub status: Option<String>,
+    pub reason: Option<String>,
+    pub app_link: Option<String>,
+    pub alert_dialog: Option<DiagnoseAlertDialog>,
+    pub jump_url: Option<String>,
+    pub hover: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiagnoseFieldProblem {
+    pub key: Option<String>,
+    pub name: Option<String>,
+    pub problem_key: Option<i32>,
+    pub problem_name: Option<String>,
+    pub suggestion: Option<String>,
+    pub base_score_suggestion: Option<String>,
+    pub is_ignored: Option<bool>,
+    pub is_support_ignore: Option<bool>,
+    pub similar_product_list: Option<serde_json::Value>,
+    pub title_typo: Option<String>,
+    pub is_base_score: Option<bool>,
+    pub problem_affect: Option<Vec<String>>,
+    pub diagnose_target: Option<String>,
+    pub ignore_operation: Option<DiagnoseIgnoreOperation>,
+    pub is_quality_score: Option<bool>,
+    pub detail_link: Option<String>,
+    pub item_rcmd_effect: Option<serde_json::Value>,
+    pub problem_category: Option<String>,
+    pub jump_link: Option<String>,
+    pub is_app_support: Option<bool>,
+    pub problem_score: Option<String>,
+    pub conversion_revenue_msg: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiagnoseListOperation {
+    pub name: Option<String>,
+    pub key: Option<String>,
+    pub status: Option<String>,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiagnoseRecommendTagInfo {
+    pub tag_type: Option<String>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiagnoseRecommend {
+    pub name: Option<String>,
+    pub props_map: Option<serde_json::Value>,
+    pub suggest_seo_title_words: Option<Vec<String>>,
+    pub recommend_tag_info_list: Option<Vec<DiagnoseRecommendTagInfo>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DiagnoseProductDetailData {
+    pub product_id: Option<i64>,
+    pub product_name: Option<String>,
+    pub product_status: Option<i32>,
+    pub product_check_status: Option<i32>,
+    pub img: Option<String>,
+    pub problem_num_to_improve: Option<i32>,
+    pub field_problem: Option<Vec<DiagnoseFieldProblem>>,
+    pub list_operation: Option<Vec<DiagnoseListOperation>>,
+    pub is_checking: Option<bool>,
+    pub diagnose_recommend: Option<DiagnoseRecommend>,
+    pub quality_score: Option<i32>,
+    pub quality_level: Option<String>,
+    pub suggest_field_problem: Option<Vec<DiagnoseFieldProblem>>,
+    pub conversion_revenue_msg: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GetDiagnoseProductDetailResponse {
+    pub errno: Option<i32>,
+    pub st: Option<i32>,
+    pub msg: Option<String>,
+    pub code: Option<i32>,
+    pub data: Option<DiagnoseProductDetailData>,
+    pub page: Option<i32>,
+    pub total: Option<i32>,
+    pub size: Option<i32>,
+}
+
+pub async fn get_diagnose_product_detail(
+    webview_id: &str,
+    webview: &Webview,
+    product_id: &str,
+) -> Result<GetDiagnoseProductDetailResponse, Box<dyn std::error::Error>> {
+    let cookie_str = get_management_cookie(webview_id);
+
+    let query_string = SHOP_INFO_PARAMS
+        .lock()
+        .unwrap()
+        .get(webview_id)
+        .map(|p| p.to_query_string())
+        .unwrap_or_default();
+
+    let url = format!(
+        "{}/product_diagnose/tproduct/get_diagnose_product_detail?product_id={}&{}",
+        FEIGE_BASE_URL, product_id, query_string
+    );
+
+    let referer = format!(
+        "https://fxg.jinritemai.com/ffa/g/create?product_id={}",
+        product_id
+    );
+
+    let (accept, accept_language, priority, sec_ch_ua, sec_ch_ua_mobile, sec_ch_ua_platform, sec_fetch_dest, sec_fetch_mode, sec_fetch_site, user_agent) = {
+        let headers_map = REQUEST_HEADERS.lock()?;
+        let h = headers_map.get(webview_id);
+
+        let accept = h.and_then(|h| h.get("accept")).cloned()
+            .unwrap_or_else(|| "application/json, text/plain, */*".to_string());
+        let accept_language = h.and_then(|h| h.get("accept-language")).cloned()
+            .unwrap_or_else(|| "zh-CN,zh;q=0.9,en;q=0.8".to_string());
+        let priority = h.and_then(|h| h.get("priority")).cloned()
+            .unwrap_or_else(|| "u=1, i".to_string());
+        let sec_ch_ua = h.and_then(|h| h.get("sec-ch-ua")).cloned()
+            .unwrap_or_else(|| "\"Google Chrome\";v=\"148\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"148\"".to_string());
+        let sec_ch_ua_mobile = h.and_then(|h| h.get("sec-ch-ua-mobile")).cloned()
+            .unwrap_or_else(|| "?0".to_string());
+        let sec_ch_ua_platform = h.and_then(|h| h.get("sec-ch-ua-platform")).cloned()
+            .unwrap_or_else(|| "\"Windows\"".to_string());
+        let sec_fetch_dest = h.and_then(|h| h.get("sec-fetch-dest")).cloned()
+            .unwrap_or_else(|| "empty".to_string());
+        let sec_fetch_mode = h.and_then(|h| h.get("sec-fetch-mode")).cloned()
+            .unwrap_or_else(|| "cors".to_string());
+        let sec_fetch_site = h.and_then(|h| h.get("sec-fetch-site")).cloned()
+            .unwrap_or_else(|| "same-origin".to_string());
+        let user_agent = h.and_then(|h| h.get("user-agent")).cloned()
+            .unwrap_or_else(|| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36".to_string());
+
+        (accept, accept_language, priority, sec_ch_ua, sec_ch_ua_mobile, sec_ch_ua_platform, sec_fetch_dest, sec_fetch_mode, sec_fetch_site, user_agent)
+    };
+
+    let headers: &[(&str, &str)] = &[
+        ("accept", &accept),
+        ("accept-language", &accept_language),
+        ("cookie", &cookie_str),
+        ("priority", &priority),
+        ("referer", &referer),
+        ("sec-ch-ua", &sec_ch_ua),
+        ("sec-ch-ua-mobile", &sec_ch_ua_mobile),
+        ("sec-ch-ua-platform", &sec_ch_ua_platform),
+        ("sec-fetch-dest", &sec_fetch_dest),
+        ("sec-fetch-mode", &sec_fetch_mode),
+        ("sec-fetch-site", &sec_fetch_site),
+        ("user-agent", &user_agent),
+        ("x-tt-from-appid", "ffa-goods"),
+        ("x-tt-from-end", "PC"),
+        ("x-tt-from-page", "https://fxg.jinritemai.com/ffa/g/create"),
+        ("x-tt-from-version", "1.0.1.3849"),
+    ];
+
+    let res = HttpClient::new().get_with_headers(&url, headers).await?;
+
+    if res.is_success() {
+        match res.json::<GetDiagnoseProductDetailResponse>() {
+            Ok(parsed) => Ok(parsed),
+            Err(e) => {
+                log::error!("[get_diagnose_product_detail] JSON 解析失败: {}", e);
+                Err(e.into())
+            }
+        }
+    } else {
+        log::error!(
+            "[get_diagnose_product_detail] 请求失败, product_id={}, status={}",
+            product_id, res.status
+        );
+        Err(format!("HTTP 请求失败, status: {}", res.status).into())
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionH5Extra {
+    pub fatal_item_ids: Option<Vec<serde_json::Value>>,
+    pub logid: Option<String>,
+    pub now: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionH5LogPb {
+    pub impr_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionPrice {
+    pub min_price: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionPriceInfo {
+    pub price: Option<PromotionPrice>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionTitleInfo {
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionBottomLabel {
+    pub render_type: Option<i32>,
+    pub label_type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionBasicInfoData {
+    pub price_info: Option<PromotionPriceInfo>,
+    pub title_info: Option<PromotionTitleInfo>,
+    pub bottom_label_list: Option<Vec<PromotionBottomLabel>>,
+    pub product_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionShopLinkButton {
+    pub text: Option<String>,
+    pub background: Option<String>,
+    pub link: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionGradeInfo {
+    pub is_new_style: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionShopBasicInfo {
+    pub shop_logo: Option<String>,
+    pub shop_name: Option<String>,
+    pub shop_link_button: Option<PromotionShopLinkButton>,
+    pub brand_icon: Option<String>,
+    pub new_brand_icon: Option<String>,
+    pub grade_info: Option<PromotionGradeInfo>,
+    pub shop_extra_info: Option<serde_json::Value>,
+    pub shop_icon_list: Option<serde_json::Value>,
+    pub background: Option<String>,
+    pub status_icon_info: Option<serde_json::Value>,
+    pub account_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionShopInfo {
+    pub basic_info: Option<PromotionShopBasicInfo>,
+    pub style_type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionCombinationInfo {
+    pub combination_jump: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionMediaContent {
+    pub url: Option<String>,
+    pub height: Option<i32>,
+    pub width: Option<i32>,
+    pub combination_info: Option<PromotionCombinationInfo>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionMedia {
+    pub name: Option<String>,
+    #[serde(rename = "type")]
+    pub media_type: Option<String>,
+    pub content_list: Option<Vec<PromotionMediaContent>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionHeadFigureData {
+    pub media_list: Option<Vec<PromotionMedia>>,
+    pub container_size: Option<i32>,
+    pub style_type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionHeaderContent {
+    pub background: Option<String>,
+    pub service_tag: Option<serde_json::Value>,
+    pub content_color: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionSafetyPopupItem {
+    pub left_icon: Option<String>,
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub url: Option<String>,
+    pub tag: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionCom {
+    #[serde(rename = "type")]
+    pub com_type: Option<String>,
+    pub text: Option<String>,
+    pub color: Option<String>,
+    pub url: Option<String>,
+    pub border_radius: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionContentItem {
+    pub render_type: Option<i32>,
+    pub label_type: Option<i32>,
+    pub link: Option<String>,
+    pub coms: Option<Vec<PromotionCom>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionSafetyContent {
+    pub safety_popup_content: Option<Vec<PromotionSafetyPopupItem>>,
+    pub service_type: Option<String>,
+    pub content_list: Option<Vec<PromotionContentItem>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionLogisticsContent {
+    pub title: Option<String>,
+    pub content_list: Option<Vec<PromotionContentItem>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionProductSupportInfoData {
+    pub header_content: Option<PromotionHeaderContent>,
+    pub safety_content: Option<PromotionSafetyContent>,
+    pub logistics_content: Option<PromotionLogisticsContent>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionTitleBar {
+    pub link: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionCommentSection {
+    pub title_bar: Option<PromotionTitleBar>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionCommentData {
+    pub good_comment: Option<PromotionCommentSection>,
+    pub buyer_show: Option<PromotionCommentSection>,
+    pub shop_extra_comment: Option<PromotionCommentSection>,
+    pub good_evaluation: Option<serde_json::Value>,
+    pub style_type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionSmallButton {
+    pub name: Option<String>,
+    pub icon_url: Option<String>,
+    pub subscript: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionTextInfo {
+    pub content: Option<String>,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionBigButton {
+    pub button_type: Option<i32>,
+    pub button_status: Option<String>,
+    pub text_info: Option<PromotionTextInfo>,
+    pub sub_text_info: Option<serde_json::Value>,
+    pub bg_color: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionFooterData {
+    pub small_button_list: Option<Vec<PromotionSmallButton>>,
+    pub big_button_list: Option<Vec<PromotionBigButton>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionH5Data {
+    pub basic_info_data: Option<PromotionBasicInfoData>,
+    pub shop_info: Option<PromotionShopInfo>,
+    pub head_figure_data: Option<PromotionHeadFigureData>,
+    pub product_support_info_data: Option<PromotionProductSupportInfoData>,
+    pub comment_data: Option<PromotionCommentData>,
+    pub shop_coupon_data: Option<serde_json::Value>,
+    pub footer_data: Option<PromotionFooterData>,
+    pub init_popup_data: Option<serde_json::Value>,
+    pub pack_detail: Option<serde_json::Value>,
+    pub page_data: Option<serde_json::Value>,
+    pub redirect_location_v2: Option<String>,
+    pub style_type: Option<i32>,
+    pub collapse_detail: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromotionPackH5Response {
+    pub extra: Option<PromotionH5Extra>,
+    pub fallback_page: Option<serde_json::Value>,
+    pub log_pb: Option<PromotionH5LogPb>,
+    pub status_code: Option<i32>,
+    pub promotion_h5: Option<PromotionH5Data>,
+    pub detail_url: Option<String>,
+}
+
+pub async fn get_promotion_pack_h5(
+    window: &Window,
+    webview_id: &str,
+    product_id: &str,
+) -> Result<PromotionPackH5Response, Box<dyn std::error::Error>> {
+    let body =
+        crate::commands::promotion_h5::get_promotion_pack_h5_via_webview(window, webview_id, product_id)
+            .await?;
+
+    match serde_json::from_str::<PromotionPackH5Response>(&body) {
+        Ok(parsed) => Ok(parsed),
+        Err(e) => {
+            log::error!(
+                "[get_promotion_pack_h5] JSON 解析失败: {}, 响应前500字节: {}",
+                e,
+                &body[..body.len().min(500)]
+            );
+            Err(e.into())
+        }
+    }
+}
 
 pub async fn get_by_conversation(
     webview: &Webview,

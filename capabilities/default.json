@@ -31,6 +31,10 @@
     "allow-pdd-send-message",
     "allow-check-token",
     "allow-on-login-success",
-    "allow-on-logout"
+    "allow-on-logout",
+    "allow-on-promotion-pack-h5",
+    "allow-account-query",
+    "allow-redeem-query",
+    "allow-add-qa"
   ]
 }

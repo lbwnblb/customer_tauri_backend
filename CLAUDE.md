@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 每次编写或修改 Rust 代码后，必须在 `src-tauri/` 目录下运行 `cargo check`，并修复所有报错，直到 `cargo check` 通过为止
 - 打印日志使用 `log` crate 的宏（`log::info!`、`log::error!`、`log::warn!`、`log::debug!`），不要用 `println!`
+- 需要从 Webview 获取 token 时，使用 `webview.cookies()` 从 cookies 中读取，不要通过 JS 回调或 localStorage
 - 每次新增 `#[command]` 方法，必须同步在以下三个文件中添加权限：
   - `permissions/default.toml` — 新增 `[[permission]]` 块，`identifier` 命名为 `allow-<command-name>`（kebab-case），`commands.allow` 指向命令名（snake_case）
   - `capabilities/default.json` — 在 `permissions` 数组中添加 `"allow-<command-name>"`
