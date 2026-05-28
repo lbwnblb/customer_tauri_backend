@@ -3,12 +3,14 @@ pub fn pdd_redirect() -> String {
         (function() {
             function checkAndNotify() {
                 console.log('[pdd_redirect] checkAndNotify called, pathname=' + location.pathname);
-                if (location.pathname.includes('/home')) {
-                    console.log('[pdd_redirect] /home detected, invoking shop_name_callback');
+                if (location.pathname.includes('/home') || location.pathname.includes('/login')  || location.pathname.includes('/chat-merchant')) {
+                    console.log('[pdd_redirect] ' + location.pathname + ' detected, invoking shop_name_callback');
                     window.__TAURI__.core.invoke('shop_name_callback')
                         .then(() => console.log('[pdd_redirect] shop_name_callback invoke success'))
                         .catch(e => console.error('[pdd_redirect] shop_name_callback invoke failed:', e));
                 }
+
+
             }
 
             const _pushState = history.pushState.bind(history);

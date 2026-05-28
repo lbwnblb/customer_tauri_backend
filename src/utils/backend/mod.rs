@@ -1,6 +1,7 @@
 pub mod token;
 pub mod chat;
 pub mod product;
+pub mod pdd_product;
 
 use std::sync::{LazyLock, Mutex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

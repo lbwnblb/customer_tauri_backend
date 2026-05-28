@@ -14,7 +14,7 @@ pub fn run() {
     utils::init_logger();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![commands::greet::greet, commands::on_request::on_request, commands::shop::shop_account, commands::shop::add_shop, commands::shop::delete_shop, commands::shop::shop_list, commands::shop::select_shop, commands::platform::select_platform,  commands::shop_callback::shop_name_callback, commands::ws_handler::on_ws, commands::ws_handler::dy_ws_recv, commands::ws_handler::dy_ws_send, commands::ws_handler::pdd_ws_recv, commands::ws_handler::pdd_ws_send, commands::http_response_intercepted::on_http_response_intercepted, commands::get_link_info::on_get_link_info, commands::pdd_send::pdd_send_message, commands::pdd_send::pdd_crypto_callback, commands::auth::on_login_success, commands::auth::on_logout, commands::auth::check_token, commands::promotion_h5::on_promotion_pack_h5, commands::account::account_query, commands::redeem::redeem_query, commands::qa::add_qa])
+        .invoke_handler(tauri::generate_handler![commands::greet::greet, commands::on_request::on_request, commands::shop::shop_account, commands::shop::add_shop, commands::shop::delete_shop, commands::shop::shop_list, commands::shop::select_shop, commands::platform::select_platform,  commands::shop_callback::shop_name_callback, commands::ws_handler::on_ws, commands::ws_handler::dy_ws_recv, commands::ws_handler::dy_ws_send, commands::ws_handler::pdd_ws_recv, commands::ws_handler::pdd_ws_send, commands::http_response_intercepted::on_http_response_intercepted, commands::get_link_info::on_get_link_info, commands::pdd_send::pdd_send_message, commands::pdd_send::pdd_crypto_callback, commands::auth::on_login_success, commands::auth::on_logout, commands::auth::check_token, commands::promotion_h5::on_promotion_pack_h5, commands::account::account_query, commands::redeem::redeem_query, commands::qa::add_qa, commands::shop::toggle_ai_reply, commands::one_click_login::one_click_login, commands::shop_platform_id::get_shop_platform_ids])
         .setup(|app| {
             let monitor = app.primary_monitor()?.expect("找不到主显示器");
             let screen_size = monitor.size();
@@ -22,7 +22,7 @@ pub fn run() {
             let height = screen_size.height as f64 * 0.5;
 
             let window = WindowBuilder::new(app, "main")
-                .title("我的应用")
+                .title("极简客服")
                 .inner_size(width, height)
                 .center()
                 .build()?;

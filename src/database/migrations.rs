@@ -41,6 +41,12 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
         );
+
+        CREATE TABLE IF NOT EXISTS webview_shop_id (
+            webview_id TEXT PRIMARY KEY,
+            platform_shop_id TEXT NOT NULL DEFAULT ''
+        );
+
         ",
     )?;
 

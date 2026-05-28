@@ -35,6 +35,9 @@
     "allow-on-promotion-pack-h5",
     "allow-account-query",
     "allow-redeem-query",
-    "allow-add-qa"
+    "allow-add-qa",
+    "allow-toggle-ai-reply",
+    "allow-one-click-login",
+    "allow-get-shop-platform-ids"
   ]
 }

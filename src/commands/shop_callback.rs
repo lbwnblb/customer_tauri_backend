@@ -3,7 +3,8 @@ use std::sync::{LazyLock, Mutex};
 use tauri::{Manager, Webview};
 use tauri::webview::Cookie;
 use crate::commands::shop::notify_shop_list_update;
-use crate::database::update_shop_name;
+use crate::database::{update_shop_name, upsert_webview_shop_id};
+use crate::utils::douyin::doudian_utils::get_current_shop_id;
 use crate::utils::douyin::feige_resp::feige_shop_info;
 use crate::utils::pinduoduo::pinduoduo_resp::query_final_credential_new;
 use crate::utils::{is_douyin_platform, is_pinduoduo_platform};
@@ -17,6 +18,14 @@ async fn handle_douyin_callback(webview: &Webview, label: &str) {
         Err(_) => return,
     };
 
+    if url.path().contains("/login/common") {
+        let _ = update_shop_name(label, "未登录");
+        if let Some(app_webview) = webview.get_webview("02_app") {
+            notify_shop_list_update(&app_webview);
+        }
+        return;
+    }
+
     match webview.cookies() {
         Ok(cookies) => {
             FEIGE_MANAGEMENT_COOKIE.lock().unwrap().insert(label.to_string(), cookies);
@@ -29,7 +38,11 @@ async fn handle_douyin_callback(webview: &Webview, label: &str) {
             if let Some(data) = info.data {
                 if let Some(shop_name) = data.shop_name {
                     if let Err(_) = update_shop_name(label, &shop_name) {
+
                     } else {
+                        if let Ok(shop_id) = get_current_shop_id(webview) {
+                            let _ = upsert_webview_shop_id(label, &shop_id);
+                        }
                         if url.path().contains("/ffa/mshop/homepage/index") {
                             webview.eval(r#"
                             window.location.href = 'https://im.jinritemai.com/pc_seller_v2/main/workspace';
@@ -52,6 +65,15 @@ async fn handle_pinduoduo_callback(webview: &Webview, label: &str) {
         Ok(url) => url,
         Err(_) => return,
     };
+
+    if url.path().contains("/login") {
+        let _ = update_shop_name(label, "未登录");
+        if let Some(app_webview) = webview.get_webview("02_app") {
+            notify_shop_list_update(&app_webview);
+        }
+        return;
+    }
+
     match query_final_credential_new(webview).await {
         Ok(resp) => {
             if let Some(result) = resp.result {
@@ -59,6 +81,7 @@ async fn handle_pinduoduo_callback(webview: &Webview, label: &str) {
                     if let Some(mall_name) = mall_info.mall_name {
                         if let Err(_) = update_shop_name(label, &mall_name) {
                         } else {
+                            let _ = upsert_webview_shop_id(label, &mall_info.id.to_string());
                             if url.path().contains("/home") {
                                 webview.eval(r#"
                                 window.location.href = 'https://mms.pinduoduo.com/chat-merchant/index.htm';

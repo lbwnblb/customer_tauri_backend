@@ -13,7 +13,7 @@ use crate::utils::douyin::protobuf::im_proto::MessageBody;
 static PROCESSED_CLIENT_MSG_IDS: LazyLock<Mutex<HashSet<String>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
-static REPLY_DEBOUNCE_MAP: LazyLock<Mutex<HashMap<String, i64>>> =
+pub static REPLY_DEBOUNCE_MAP: LazyLock<Mutex<HashMap<String, i64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub static SHARK_PRODUCT_ID_MAP: LazyLock<Mutex<HashMap<String, String>>> =
@@ -54,13 +54,14 @@ async fn handle_auto_reply(
     sub_conversation_short_id: Option<i64>,
     sec_sender: String,
 ) {
+    if !crate::database::ai_reply::get_ai_reply_enabled(webview.label()).unwrap_or(true) {
+        info!("[IM] [RECV] AI回复已关闭，跳过自动回复 webview={}", webview.label());
+        return;
+    }
     let ts = crate::utils::timestamp_millis();
     REPLY_DEBOUNCE_MAP.lock().unwrap().insert(sec_sender.clone(), ts);
 
-    if REPLY_DEBOUNCE_MAP.lock().unwrap().get(&sec_sender).copied() != Some(ts) {
-        info!("[IM] [DEBOUNCE] sec_sender={} 有新消息到达，跳过本次自动回复", sec_sender);
-        return;
-    }
+    
     let token = crate::utils::backend::get_app_token(webview).await;
     let conversation = match get_by_conversation(webview, security_conversation_id, conversation_short_id).await.map_err(|e| e.to_string()) {
         Ok(c) => c,
@@ -69,15 +70,17 @@ async fn handle_auto_reply(
             return;
         }
     };
-    let mut read_message_index = conversation.last().and_then(|m| m.index_in_conversation).unwrap_or(0);
-    let mut read_message_index_v2 = conversation.last().and_then(|m| m.index_in_conversation_v2).unwrap_or(0);
+    let read_message_index = conversation.last().and_then(|m| m.index_in_conversation).unwrap_or(0);
+    let read_message_index_v2 = conversation.last().and_then(|m| m.index_in_conversation_v2).unwrap_or(0);
     let messages = convert_messages(conversation);
     if token.is_empty() {
         warn!("[IM] [RECV] 后端 token 未设置，跳过自动回复");
         return;
     }
     let shark_pid = SHARK_PRODUCT_ID_MAP.lock().unwrap().get(&sec_sender).cloned();
-    let reply = match crate::utils::backend::send_chat_message(&token, &messages, shark_pid.as_deref(), Some(&sec_sender), crate::utils::platform_id_from_webview_id(webview.label())).await {
+    let shop_id = crate::database::webview_shop_id::get_platform_shop_id(webview.label())
+        .unwrap_or(None);
+    let reply = match crate::utils::backend::send_chat_message(&token, &messages, shark_pid.as_deref(), Some(&sec_sender), crate::utils::platform_id_from_webview_id(webview.label()), shop_id.as_deref()).await {
         Ok(r) => {
             info!("[IM] [RECV] 后端响应: {}", serde_json::to_string(&r).unwrap_or_default());
             r
@@ -101,7 +104,7 @@ async fn handle_auto_reply(
             } else {
                 warn!("[IM] [RECV] 获取 main window 失败，跳过 sync_promotion_h5");
             }
-            match crate::utils::backend::send_chat_message(&token, &messages, shark_pid.as_deref(), Some(&sec_sender), crate::utils::platform_id_from_webview_id(webview.label())).await {
+            match crate::utils::backend::send_chat_message(&token, &messages, shark_pid.as_deref(), Some(&sec_sender), crate::utils::platform_id_from_webview_id(webview.label()), shop_id.as_deref()).await {
                 Ok(r) => {
                     info!("[IM] [RECV] 后端响应(重试): {}", serde_json::to_string(&r).unwrap_or_default());
                     r
@@ -137,11 +140,17 @@ async fn handle_auto_reply(
     }
     webview.eval(&js).ok();
 
+    let read_badge_count = crate::utils::douyin::mark_read::CONV_BADGE_COUNT_MAP
+        .lock().unwrap()
+        .get(&conversation_short_id)
+        .copied()
+        .unwrap_or(0);
+
     crate::utils::douyin::mark_read::send_mark_read(webview, crate::utils::douyin::mark_read::MarkReadParams {
         conversation_short_id,
         read_message_index,
         read_message_index_v2,
-        read_badge_count: 0,
+        read_badge_count,
         conv_unread_count: 0,
         total_unread_count: 0,
         sub_conversation_short_id,

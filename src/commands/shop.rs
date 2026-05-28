@@ -1,6 +1,6 @@
 use tauri::{Manager, Webview, Window};
 use serde::{Deserialize, Serialize};
-use crate::database::{get_all_shops, delete_shop_webview, ShopWebview};
+use crate::database::{get_all_shops, delete_shop_webview, set_ai_reply_enabled, get_ai_reply_enabled, ShopWebview};
 use crate::utils::{app_data_dir, get_platform_from_id, is_douyin_platform, is_pinduoduo_platform, PLATFORM_DOUYIN, PLATFORM_PINDUODUO};
 use crate::commands::webview_utils::{activate_08_webview, get_active_08};
 use crate::webview::creator::{create_douyin_webview, create_pinduoduo_webview, create_platform_webview, get_webview_ids, has_webview, remove_webview_id};
@@ -15,15 +15,20 @@ pub struct Shop {
     id: String,
     name: String,
     platform: String,
+    enabled: bool,
 }
 
 #[tauri::command]
 pub fn shop_list() -> Vec<Shop> {
     match get_all_shops() {
-        Ok(shops) => shops.into_iter().map(|shop| Shop {
-            id: shop.id.clone(),
-            name: shop.shop_name,
-            platform: get_platform_from_id(&shop.id),
+        Ok(shops) => shops.into_iter().map(|shop| {
+            let enabled = get_ai_reply_enabled(&shop.id).unwrap_or(true);
+            Shop {
+                id: shop.id.clone(),
+                name: shop.shop_name,
+                platform: get_platform_from_id(&shop.id),
+                enabled,
+            }
         }).collect(),
         Err(_) => vec![],
     }
@@ -127,6 +132,14 @@ pub(crate) fn notify_shop_list_update(webview: &Webview) {
             log::error!("[shop_name_callback] 获取店铺列表失败: {}", e);
         }
     };
+}
+
+#[tauri::command]
+pub fn toggle_ai_reply(shop_id: String, enabled: bool) {
+    if let Err(e) = set_ai_reply_enabled(&shop_id, enabled) {
+        log::error!("[toggle_ai_reply] 写库失败: {e}");
+    }
+    log::info!("[toggle_ai_reply] shop_id={} enabled={}", shop_id, enabled);
 }
 
 // 必须用 async：同步 command 跑在 blocking 线程池，

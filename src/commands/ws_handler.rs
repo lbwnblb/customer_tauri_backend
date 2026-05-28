@@ -82,13 +82,9 @@ pub fn pdd_ws_recv(webview: Webview, data: Vec<u8>) {
     info!("[WS][PDD] 收到二进制消息, webview={}, len={}", webview.label(), data.len());
     if let Some(buyer_uid) = decode_titan_frame(&data) {
         info!("[WS][PDD] 检测到买家消息，准备自动回复: uid={}", buyer_uid);
-        tauri::async_runtime::spawn(async move {
-            if let Err(e) = crate::commands::pdd_send::send_pdd_auto_reply(&webview, &buyer_uid, "你好").await {
-                log::warn!("[PDD][AutoReply] 自动回复失败: uid={} err={}", buyer_uid, e);
-            } else {
-                info!("[PDD][AutoReply] 已回复: uid={}", buyer_uid);
-            }
-        });
+        tauri::async_runtime::spawn(
+            crate::utils::pinduoduo::auto_reply::handle_buyer_message(webview, buyer_uid)
+        );
     }
 }
 

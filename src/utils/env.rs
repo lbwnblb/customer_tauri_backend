@@ -6,14 +6,14 @@ pub enum Env {
 }
 
 /// 当前运行环境。切换时修改此行即可。
-pub const CURRENT_ENV: Env = Env::Dev;
+pub const CURRENT_ENV: Env = Env::Prod;
 
 impl Env {
     pub fn base_url(self) -> &'static str {
         match self {
             Env::Dev => "http://127.0.0.1:7788",
             Env::Test => "http://127.0.0.1:7788", // TODO: 填写 test 地址
-            Env::Prod => "http://127.0.0.1:7788", // TODO: 填写 prod 地址
+            Env::Prod => "https://kefu.qwera.asia", // TODO: 填写 prod 地址
         }
     }
 

@@ -152,8 +152,15 @@ pub async fn feige_im_recv(webview: &Webview, bytes: &[u8]) {
                                                     warn!("[IM] [RECV] Response.Body.NewMessageNotify 为空")
                                                 }
                                                 Some(ref has_new_message_notify) => {
-                                                    // has_new_message_notify
-                                                    // info!("[IM] [RECV] response新消息通知:{:?}",response);
+                                                    // 存储 badge_count 供 mark_read 使用
+                                                    if let (Some(short_id), Some(badge_count)) = (
+                                                        has_new_message_notify.message.as_ref().and_then(|m| m.conversation_short_id),
+                                                        has_new_message_notify.badge_count
+                                                    ) {
+                                                        super::mark_read::CONV_BADGE_COUNT_MAP
+                                                            .lock().unwrap()
+                                                            .insert(short_id, badge_count);
+                                                    }
                                                     match has_new_message_notify.message {
                                                         None => {}
                                                         Some(ref message) => {

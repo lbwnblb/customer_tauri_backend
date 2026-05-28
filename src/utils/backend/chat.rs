@@ -13,6 +13,8 @@ struct ChatRequest<'a> {
     sec_sender: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     platform_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shop_id: Option<&'a str>,
 }
 
 #[derive(Debug)]
@@ -38,8 +40,8 @@ impl std::fmt::Display for ChatError {
 
 impl std::error::Error for ChatError {}
 
-pub async fn send_chat_message(token: &str, messages: &[Message], shark_product_id: Option<&str>, sec_sender: Option<&str>, platform_id: Option<&str>) -> Result<Reply, ChatError> {
-    let req = ChatRequest { messages, shark_product_id, sec_sender, platform_id };
+pub async fn send_chat_message(token: &str, messages: &[Message], shark_product_id: Option<&str>, sec_sender: Option<&str>, platform_id: Option<&str>, shop_id: Option<&str>) -> Result<Reply, ChatError> {
+    let req = ChatRequest { messages, shark_product_id, sec_sender, platform_id, shop_id };
     log::info!("[chat] 请求参数: {}", serde_json::to_string(&req).unwrap_or_default());
 
     let resp = Client::new()

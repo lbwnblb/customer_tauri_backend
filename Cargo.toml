@@ -31,6 +31,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 tokio = { version = "1", features = ["time", "sync"] }
 log = "0.4"
 env_logger = "0.11"
+fern = "0.7"
 chrono = "0.4"
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 prost = "0.13"

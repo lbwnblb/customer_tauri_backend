@@ -1,7 +1,7 @@
 pub fn douyin_redirect(webview_id: &str) -> String {
     r#"
         (function() {
-                if (location.pathname.includes('/ffa/mshop/homepage/index')) {
+                if (location.pathname.includes('/ffa/mshop/homepage/index') || location.pathname.includes('/login/common')) {
                     window.__TAURI__.core.invoke('shop_name_callback');
                 }
         })();

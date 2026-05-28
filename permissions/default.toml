@@ -1,6 +1,11 @@
 # 自定义命令权限定义
 
 [[permission]]
+identifier = "allow-get-shop-platform-ids"
+description = "允许调用 get_shop_platform_ids"
+commands.allow = ["get_shop_platform_ids"]
+
+[[permission]]
 identifier = "allow-check-token"
 description = "允许调用 check_token"
 commands.allow = ["check_token"]
@@ -136,7 +141,17 @@ description = "允许调用 redeem_query"
 commands.allow = ["redeem_query"]
 
 [[permission]]
+identifier = "allow-toggle-ai-reply"
+description = "允许调用 toggle_ai_reply"
+commands.allow = ["toggle_ai_reply"]
+
+[[permission]]
 identifier = "allow-on-promotion-pack-h5"
 description = "允许 promo_h5 隐藏 webview 回调 promotion pack h5 响应"
 commands.allow = ["on_promotion_pack_h5"]
+
+[[permission]]
+identifier = "allow-one-click-login"
+description = "允许调用 one_click_login"
+commands.allow = ["one_click_login"]
 
