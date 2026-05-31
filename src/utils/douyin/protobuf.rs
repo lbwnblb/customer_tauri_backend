@@ -7,7 +7,7 @@ use crate::utils::douyin::doudian_utils::{TICKET_NOTIFY_MAP};
 use crate::utils::douyin::protobuf::im_proto::{MessageBody};
 
 pub mod im_proto {
-    include!(concat!(env!("OUT_DIR"), "/dy_im_proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/im_proto.rs"));
 }
 
 pub static SEND_REQUEST_MAP: LazyLock<Mutex<HashMap<String, im_proto::Request>>> =

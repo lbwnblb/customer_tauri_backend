@@ -13,7 +13,7 @@ impl Env {
         match self {
             Env::Dev => "http://127.0.0.1:7788",
             Env::Test => "http://127.0.0.1:7788", // TODO: 填写 test 地址
-            Env::Prod => "https://kefu.qwera.asia", // TODO: 填写 prod 地址
+            Env::Prod => "https://kefu.aiyiyong.com",
         }
     }
 

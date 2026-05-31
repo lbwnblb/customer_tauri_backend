@@ -277,6 +277,49 @@ pub async fn get_json<T: DeserializeOwned>(url: &str) -> Result<T, HttpError> {
 mod tests {
     use super::*;
 
+    /// 逐步排查 kefu.qwera.asia 连接问题
+    #[tokio::test]
+    async fn test_backend_connectivity() {
+        let url = "https://kefu.qwera.asia/api/v1/";
+
+        // 1. 默认客户端
+        println!("--- 1. 默认客户端 ---");
+        match Client::new().get(url).send().await {
+            Ok(r) => println!("OK: {}", r.status()),
+            Err(e) => println!("ERR: {e}"),
+        }
+
+        // 2. http1_only（禁用 HTTP/2 ALPN）
+        println!("--- 2. http1_only ---");
+        match Client::builder().http1_only().build().unwrap().get(url).send().await {
+            Ok(r) => println!("OK: {}", r.status()),
+            Err(e) => println!("ERR: {e}"),
+        }
+
+        // 3. 跳过证书校验（排查自签名证书）
+        println!("--- 3. danger_accept_invalid_certs ---");
+        match Client::builder()
+            .danger_accept_invalid_certs(true)
+            .http1_only()
+            .build()
+            .unwrap()
+            .get(url)
+            .send()
+            .await
+        {
+            Ok(r) => println!("OK: {}", r.status()),
+            Err(e) => println!("ERR: {e}"),
+        }
+
+        // 4. 降级到 HTTP（排查 HTTPS 本身不通）
+        println!("--- 4. HTTP（非 HTTPS）---");
+        let http_url = url.replace("https://", "http://");
+        match Client::new().get(&http_url).send().await {
+            Ok(r) => println!("OK: {}", r.status()),
+            Err(e) => println!("ERR: {e}"),
+        }
+    }
+
     #[tokio::test]
     async fn test_post_json_server_error() -> Result<(), Box<dyn std::error::Error>> {
         let res = HttpClient::new().get_with_headers(

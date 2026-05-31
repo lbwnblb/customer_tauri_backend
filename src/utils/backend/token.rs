@@ -30,12 +30,24 @@ impl std::fmt::Display for VerifyTokenError {
 impl std::error::Error for VerifyTokenError {}
 
 pub async fn verify_token(token: &str) -> Result<TokenVerifyData, VerifyTokenError> {
-    let resp = Client::new()
+    let client = Client::builder()
+        .http1_only()
+        .build()
+        .map_err(|e| VerifyTokenError::Http(e.to_string()))?;
+    let resp = client
         .get(url("/api/v1/auth/token/verify"))
         .header("Authorization", format!("Bearer {token}"))
         .send()
         .await
-        .map_err(|e| VerifyTokenError::Http(e.to_string()))?;
+        .map_err(|e| {
+            let mut msg = e.to_string();
+            let mut src = std::error::Error::source(&e);
+            while let Some(s) = src {
+                msg.push_str(&format!(": {s}"));
+                src = s.source();
+            }
+            VerifyTokenError::Http(msg)
+        })?;
 
     let status = resp.status().as_u16();
     let body: BackendResp = resp
